@@ -3,11 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Three AI merchants lend real ledger gold on NEAR. Talk one into an advance, skip the repayment, and watch the other towns hear about it.">
-<title>long con</title>
+<title>Long Con game ledger</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="app"></div>
-<script type="module" src="/src/main.ts"></script>
+<main class="wrap">
+  <h1>Long Con game ledger</h1>
+  <p class="lead">Live merchants, treasuries, and con records from the Long Con contract on NEAR.</p>
+  <p class="meta" id="meta">Reading from the contract...</p>
+
+  <section>
+    <h2>Merchants and treasuries</h2>
+    <p class="what">What you are seeing: each merchant's gold in the strongbox (its treasury), grain stock, buy and sell prices, outstanding loans, and gold lost to cons. All values come live from the contract.</p>
+    <div id="merchants" class="panel"></div>
+  </section>
+
+  <section>
+    <h2>Con records</h2>
+    <p class="what">What you are seeing: landed cons written by the contract, with class, town, amount, and request and response hashes. No pitch text is stored.</p>
+    <div id="records" class="panel"></div>
+  </section>
+</main>
+<script src="app.js"></script>
 </body>
 </html>

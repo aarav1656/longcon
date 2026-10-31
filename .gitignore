@@ -6,3 +6,8 @@ node_modules/
 ._*
 .DS_Store
 .progress/
+worker/node_modules/
+web/node_modules/
+web/dist/
+*.jsonl
+.env

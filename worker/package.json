@@ -1,0 +1,17 @@
+{
+  "name": "longcon-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "worker": "bun run src/worker.ts",
+    "relayer": "bun run src/relayer.ts",
+    "test": "bun test ./test"
+  },
+  "dependencies": {
+    "near-api-js": "^7.4.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

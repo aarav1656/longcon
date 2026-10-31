@@ -1,0 +1,16 @@
+[package]
+name = "longcon-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+near-workspaces = { version = "0.24.0", features = ["unstable"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+anyhow = "1"
+sha2 = "0.10"
+hex = "0.4"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.8"

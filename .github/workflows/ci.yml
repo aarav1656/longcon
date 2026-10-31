@@ -1,0 +1,29 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-near
+      - name: layout check
+        run: test -f Cargo.toml || { echo "no root Cargo.toml: add a workspace manifest so CI can build every contract"; exit 1; }
+      - name: build wasm
+        run: cargo build --workspace --release --target wasm32-unknown-unknown
+      - name: test
+        run: cargo test --workspace --no-fail-fast
+        env:
+          CARGO_TERM_COLOR: always

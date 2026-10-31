@@ -14,7 +14,12 @@ async fn signed_answer_commits_and_gas_is_measured() -> Result<()> {
     println!("npc_resume total gas burnt incl. resume receipt: {resume_tgas:.2} Tgas; receipts: {burnt:?}");
     assert!(r.is_success(), "{:?}", r.failures());
     assert!(resume_tgas < 30.0, "verify path must stay under 30 Tgas, got {resume_tgas}");
-    let out = o.status.await?.json::<serde_json::Value>()?;
+    let settled = o.status.await?;
+    let per_receipt: Vec<f64> = settled.outcomes().iter().map(|x| x.gas_burnt.as_gas() as f64 / 1e12).collect();
+    let callback = per_receipt.iter().cloned().fold(0.0, f64::max);
+    println!("offer tx receipts burnt (Tgas): {per_receipt:?}; the on_terms callback reserves 30");
+    assert!(callback < 15.0, "on_terms must stay well inside its 30 Tgas reservation or an offer could never settle: {per_receipt:?}");
+    let out = settled.json::<serde_json::Value>()?;
     println!("outcome: {out}");
     assert_eq!(out["status"], json!("committed"));
     assert_eq!(out["advance"], json!(5));

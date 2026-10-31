@@ -123,12 +123,12 @@ async fn quotes_cannot_open_an_arbitrage_between_merchants() -> Result<()> {
     let buys = [pell["buy_price"].as_u64().unwrap(), marta["buy_price"].as_u64().unwrap(), osk["buy_price"].as_u64().unwrap()];
     let sells = [pell["sell_price"].as_u64().unwrap(), marta["sell_price"].as_u64().unwrap(), osk["sell_price"].as_u64().unwrap()];
     assert!(buys.iter().max() < sells.iter().min(), "buys {buys:?} sells {sells:?}");
-    // the pump itself: buy 4 grain at the cheapest seller, sell them to the dearest buyer
+    // the pump itself: buy 3 grain at the cheapest seller, sell them to the dearest buyer
     let cheapest = if marta["sell_price"].as_u64() <= osk["sell_price"].as_u64() { 0u8 } else { 2 };
     let dearest = if pell["buy_price"].as_u64() >= marta["buy_price"].as_u64() { 1u8 } else { 0 };
     let before = w.player_view(a.id()).await?["gold"].as_u64().unwrap();
-    a.call(w.contract.id(), "trade").args_json(json!({"merchant": cheapest, "side": "buy", "qty": 4})).max_gas().transact().await?.into_result()?;
-    a.call(w.contract.id(), "trade").args_json(json!({"merchant": dearest, "side": "sell", "qty": 4})).max_gas().transact().await?.into_result()?;
+    a.call(w.contract.id(), "trade").args_json(json!({"merchant": cheapest, "side": "buy", "qty": 3})).max_gas().transact().await?.into_result()?;
+    a.call(w.contract.id(), "trade").args_json(json!({"merchant": dearest, "side": "sell", "qty": 3})).max_gas().transact().await?.into_result()?;
     let after = w.player_view(a.id()).await?["gold"].as_u64().unwrap();
     println!("pump attempt: gold {before} -> {after}");
     assert!(after < before, "the round trip must lose gold");

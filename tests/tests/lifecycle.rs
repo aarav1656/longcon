@@ -18,8 +18,8 @@ async fn a_merchant_that_never_answers_times_out_and_the_bond_comes_back() -> Re
     assert_eq!(pv["locked_bonds"], json!(0));
     assert_eq!(pv["pending_offer"], Value::Null);
     assert_eq!(w.view("pending_offers", json!({})).await?, json!([]));
-    let late = failure_text(w.answer(&o, &terms("accept", 5, 5, 2, "other")).await).expect("late answer must fail");
-    assert!(late.contains("settled") || late.contains("not awaiting"), "{late}");
+    let late = failure_text(w.relay(o.id, "{}", &"00".repeat(64), "provider_tee").await).expect("late answer must fail");
+    assert!(late.contains("offer is not awaiting an answer"), "{late}");
     w.audit().await?;
     Ok(())
 }
@@ -93,7 +93,6 @@ async fn news_of_a_landed_con_travels_one_town_per_day() -> Result<()> {
     assert_eq!(landed, day, "record is dated the day it landed");
 
     let marker = "a future_cargo pitch won an advance of 6 gold";
-    let mut seen = vec![];
     for step in 0..3u64 {
         let mut row = vec![];
         for (merchant, name) in [(0u8, "Marta"), (1, "Pell"), (2, "Osk")] {
@@ -123,7 +122,7 @@ async fn the_day_cannot_be_forced_before_it_ends_or_by_strangers() -> Result<()>
     let a = w.player("alice").await?;
     let early = failure_text(w.advance_day(&a).await).expect("day not over");
     assert!(early.contains("the day has not ended yet"), "{early}");
-    let stranger = w.worker.root_account()?.create_subaccount("stranger").initial_balance(near_workspaces::types::NearToken::from_near(1)).transact().await?.into_result()?;
+    let stranger = w.worker.root_account()?.create_subaccount("stranger").initial_balance(near_workspaces::types::NearToken::from_near(2)).transact().await?.into_result()?;
     let t = failure_text(w.advance_day(&stranger).await).expect("stranger");
     assert!(t.contains("join the road first"), "{t}");
     w.owner_call("set_day_length_ms", json!({"day_length_ms": 0})).await?.into_result()?;

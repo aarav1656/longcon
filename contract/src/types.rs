@@ -100,6 +100,8 @@ pub struct Resumed {
 #[derive(Clone, Debug)]
 pub struct Outcome {
     pub status: OfferStatus,
+    pub proposed_advance: u64,
+    pub proposed_repay: u64,
     pub advance: u64,
     pub repay: u64,
     pub due_day: u32,

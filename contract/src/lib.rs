@@ -3,6 +3,7 @@
 //! the signature over the exact request it built, then clamps the terms against hard caps.
 mod attest;
 mod prompt;
+mod rumour;
 pub mod rules;
 pub mod types;
 
@@ -26,6 +27,8 @@ enum Key {
     DueIndex,
     DueExposure,
     Records,
+    RumourBalances,
+    RumourSupply,
 }
 
 #[near(contract_state)]
@@ -48,6 +51,9 @@ pub struct Contract {
     due_exposure: LookupMap<(u8, u32), u64>,
     records: Vector<ConRecord>,
     supply: Supply,
+    rumour_balances: LookupMap<(AccountId, String), u128>,
+    rumour_supply: LookupMap<String, u128>,
+    wanted: Vec<(ConClass, u64, u64)>,
 }
 
 fn yield_id(player: &AccountId, nonce: u64) -> [u8; 32] {
@@ -107,6 +113,9 @@ impl Contract {
             due_index: LookupMap::new(Key::DueIndex),
             due_exposure: LookupMap::new(Key::DueExposure),
             records: Vector::new(Key::Records),
+            rumour_balances: LookupMap::new(Key::RumourBalances),
+            rumour_supply: LookupMap::new(Key::RumourSupply),
+            wanted: vec![],
         }
     }
 
@@ -310,6 +319,8 @@ impl Contract {
         let outcome = match resumed {
             Err(_) => Outcome {
                 status: OfferStatus::TimedOut,
+                proposed_advance: 0,
+                proposed_repay: 0,
                 advance: 0,
                 repay: 0,
                 due_day: 0,
@@ -411,6 +422,7 @@ impl Contract {
                 response_hash: d.response_hash.clone(),
             };
             emit("con_landed", json!({"record_id": rec.id, "class": rec.class, "town": rec.town, "loss": rec.loss}));
+            self.mint_rumour(&rec);
             self.records.push(rec);
         }
         emit("day_advanced", json!({"day": self.day}));
@@ -618,6 +630,8 @@ impl Contract {
 
         let mut out = Outcome {
             status: OfferStatus::Refused,
+            proposed_advance: prop.advance,
+            proposed_repay: prop.repay,
             advance: 0,
             repay: 0,
             due_day: 0,

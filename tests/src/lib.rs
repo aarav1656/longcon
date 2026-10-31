@@ -19,18 +19,14 @@ fn root_dir() -> PathBuf {
 }
 
 async fn build() -> Result<Vec<u8>> {
-    let dir = root_dir().join("contract");
     let out = root_dir().join("target").join("wasm");
-    std::fs::create_dir_all(&out)?;
-    let status = tokio::process::Command::new("cargo")
-        .args(["near", "build", "non-reproducible-wasm", "--no-abi", "--out-dir"])
+    let status = tokio::process::Command::new(root_dir().join("scripts").join("build-wasm.sh"))
         .arg(&out)
-        .current_dir(&dir)
         .status()
         .await
-        .context("run cargo near build")?;
+        .context("run scripts/build-wasm.sh")?;
     if !status.success() {
-        return Err(anyhow!("cargo near build failed: {status}"));
+        return Err(anyhow!("build-wasm.sh failed: {status}"));
     }
     std::fs::read(out.join("longcon.wasm")).context("read longcon.wasm")
 }
@@ -83,7 +79,7 @@ impl World {
             .into_result()?;
         let signer = SigningKey::generate(&mut rand::rngs::OsRng);
         let w = Self { worker, owner, contract, signer };
-        w.owner_call("set_signer", json!({"name": MODEL, "key_hex": hex::encode(w.signer.verifying_key().to_bytes())})).await?;
+        w.owner_call("set_signer", json!({"name": MODEL, "key_hex": hex::encode(w.signer.verifying_key().to_bytes())})).await?.into_result()?;
         Ok(w)
     }
 
@@ -156,9 +152,14 @@ impl World {
 
     /// Fetch the request, sign `content` as the model, relay it. Returns the npc_resume result.
     pub async fn answer(&self, o: &OpenOffer, content: &str) -> Result<ExecutionFinalResult> {
-        let body: String = self.view("request_body", json!({"offer_id": o.id})).await?.as_str().unwrap().to_string();
+        self.answer_id(o.id, content).await
+    }
+
+    /// For a caller that already moved the offer status future out of its `OpenOffer`.
+    pub async fn answer_id(&self, id: u64, content: &str) -> Result<ExecutionFinalResult> {
+        let body: String = self.view("request_body", json!({"offer_id": id})).await?.as_str().unwrap().to_string();
         let (response, signature) = self.signed(&body, content);
-        self.relay(o.id, &response, &signature, "provider_tee").await
+        self.relay(id, &response, &signature, "provider_tee").await
     }
 
     pub async fn relay(&self, offer_id: u64, response: &str, signature: &str, kind: &str) -> Result<ExecutionFinalResult> {

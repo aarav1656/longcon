@@ -18,10 +18,11 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - uses: cargo-bins/cargo-binstall@main
-      - name: install cargo-near
+      - name: install binaryen
         run: |
-          cargo binstall -y --locked cargo-near || cargo install --locked cargo-near
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+          wasm-opt --version
       - name: layout check
         run: |
           if [ ! -f Cargo.toml ]; then
@@ -30,7 +31,7 @@ jobs:
           fi
       - name: build wasm
         run: |
-          cargo build --workspace --release --target wasm32-unknown-unknown
+          scripts/build-wasm.sh target/wasm
       - name: test
         run: |
           cargo test --workspace --no-fail-fast

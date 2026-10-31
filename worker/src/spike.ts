@@ -15,6 +15,7 @@ const contractId = env('CONTRACT_ID');
 const p = provider();
 const owner = account('OWNER_ACCOUNT_ID', 'OWNER_PRIVATE_KEY');
 const worker = account('WORKER_ACCOUNT_ID', 'WORKER_PRIVATE_KEY');
+const MERCHANT = Number(process.env.SPIKE_MERCHANT ?? 1); // a merchant with treasury room; a saturated one refuses at offer()
 const OUT = process.env.SPIKE_OUT ?? 'spike-results.jsonl';
 const FUND = BigInt(process.env.SPIKE_FUND_YOCTO ?? '120000000000000000000000'); // 0.12 NEAR per traveler covers the 100 Tgas reservation at testnet gas prices
 const OFFER_GAS = BigInt(process.env.SPIKE_OFFER_TGAS ?? '100') * 1_000_000_000_000n;
@@ -106,7 +107,7 @@ async function latency(turns: number) {
     for (let i = 0; i < turns; i++) {
       const t = await newTraveler();
       const pitch = PITCHES[i % PITCHES.length];
-      const t0 = await submitOffer(t, 1, pitch.ask, 5, pitch.text);
+      const t0 = await submitOffer(t, MERCHANT, pitch.ask, 5, pitch.text);
       const r = await terminal(t, t0);
       results.push(r.ms);
       out({ ev: 'latency_turn', i, pitch: pitch.key, ms: r.ms, status: r.offer.status, proposed: r.offer.outcome?.proposed_advance, advance: r.offer.outcome?.advance });
@@ -128,7 +129,7 @@ async function batch() {
   const ts = [await newTraveler(), await newTraveler(), await newTraveler()];
   startWorker(env('LLM_MODEL'), metrics);
   try {
-    const t0s = await Promise.all(ts.map((t, i) => submitOffer(t, 1, PITCHES[i].ask, 5, PITCHES[i].text)));
+    const t0s = await Promise.all(ts.map((t, i) => submitOffer(t, MERCHANT, PITCHES[i].ask, 5, PITCHES[i].text)));
     const rs = await Promise.all(ts.map((t, i) => terminal(t, t0s[i])));
     const resumed = metricLines(metrics).filter((l) => l.ev === 'resumed');
     out({
@@ -144,15 +145,16 @@ async function negative() {
   const { answer } = await import('./llm.ts');
   const { sha256Hex } = await import('./lib.ts');
   const t = await newTraveler();
-  const t0 = await submitOffer(t, 1, 6, 5, PITCHES[6].text);
+  const t0 = await submitOffer(t, MERCHANT, 6, 5, PITCHES[6].text);
   await sleep(4500); // let the batch window pass
-  await worker.callFunction({ contractId, methodName: 'seal_batch', args: { merchant: 1 }, gas: 100_000_000_000_000n, deposit: 0n });
+  await worker.callFunction({ contractId, methodName: 'seal_batch', args: { merchant: MERCHANT }, gas: 100_000_000_000_000n, deposit: 0n });
   const batches: any[] = await view(p, contractId, 'open_batches');
   const b = batches[batches.length - 1];
   const body: string = await view(p, contractId, 'batch_body', { batch_id: b.id });
   const cfg = { baseUrl: env('LLM_BASE_URL').replace(/\/$/, ''), apiKey: env('LLM_API_KEY'), model: env('LLM_MODEL'), signMode: 'worker' as const, seed: env('WORKER_SIGNING_SEED') };
   const a = await answer(cfg, body, 1, Date.now() + 100_000);
-  const altered = a.response.replace(/"verdict\\":\\"(accept|refuse)/, (m) => (m.includes('accept') ? m.replace('accept', 'refuse') : m.replace('refuse', 'accept')));
+  const altered = a.response.replace(/verdict\\?"\s*:\s*\\?"(accept|refuse)/, (m) => (m.includes('accept') ? m.replace('accept', 'refuse') : m.replace('refuse', 'accept')));
+  if (altered === a.response) throw new Error('negative spike could not locate a verdict to alter in the signed response');
   const changed = altered !== a.response;
   let rejected = '';
   try {

@@ -137,6 +137,36 @@ async fn quotes_cannot_open_an_arbitrage_between_merchants() -> Result<()> {
 }
 
 #[tokio::test]
+async fn a_merchant_cannot_cut_its_sell_quote_down_to_another_merchants_buy_quote() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let a = w.player("alice").await?;
+    // Pell buys at 5 and Marta sells at 6. Marta proposes selling at 1: the road keeps her at 6, since 5 would meet Pell's buy quote.
+    let content = json!({"verdict":"refuse","advance":0,"repay":0,"due_days":1,"buy_price":4,"sell_price":1,"class":"other","reason":"prices"}).to_string();
+    w.play(&a, 0, 5, 5, "sell grain at one gold", &content).await?;
+    let sells: Vec<u64> = road_sells(&w).await?;
+    let buys: Vec<u64> = road_buys(&w).await?;
+    assert!(buys.iter().max() < sells.iter().min(), "buys {buys:?} sells {sells:?}");
+    w.audit().await?;
+    Ok(())
+}
+
+async fn road_sells(w: &World) -> Result<Vec<u64>> {
+    let mut v = vec![];
+    for i in 0..3usize {
+        v.push(w.merchant(i).await?["sell_price"].as_u64().unwrap());
+    }
+    Ok(v)
+}
+
+async fn road_buys(w: &World) -> Result<Vec<u64>> {
+    let mut v = vec![];
+    for i in 0..3usize {
+        v.push(w.merchant(i).await?["buy_price"].as_u64().unwrap());
+    }
+    Ok(v)
+}
+
+#[tokio::test]
 async fn trading_builds_the_credit_line_and_a_round_trip_costs_the_spread() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let a = w.player("alice").await?;

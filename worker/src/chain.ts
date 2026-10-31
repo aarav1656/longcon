@@ -18,8 +18,8 @@ globalThis.fetch = (async (input: any, init?: any) => {
   const host = new URL(typeof input === 'string' ? input : (input.url ?? String(input))).host;
   for (let attempt = 0; ; attempt++) {
     const r = await realFetch(input, init);
-    if (r.status !== 429 || !rpcHosts.has(host) || attempt >= 8) return r;
-    await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+    if (r.status !== 429 || !rpcHosts.has(host) || attempt >= 30) return r;
+    await new Promise((res) => setTimeout(res, Math.min(800 * (attempt + 1), 5000)));
   }
 }) as typeof fetch;
 

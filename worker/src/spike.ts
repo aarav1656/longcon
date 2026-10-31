@@ -101,6 +101,7 @@ const PITCHES: { key: string; cls: string; text: string; ask: number }[] = [
 
 async function latency(turns: number) {
   const metrics = `spike-latency-${Date.now()}.jsonl`;
+  await setModel(env('LLM_MODEL')); // the contract must name the model the worker answers with
   startWorker(env('LLM_MODEL'), metrics);
   const results: number[] = [];
   try {

@@ -11,6 +11,18 @@ export const RPC: Record<string, string> = {
   mainnet: 'https://free.rpc.fastnear.com',
 };
 
+const rpcHosts = new Set([...Object.values(RPC), process.env.NEAR_RPC_URL ?? ''].filter(Boolean).map((u) => new URL(u).host));
+const realFetch = globalThis.fetch;
+/** The public RPCs answer a burst with 429 and near-api-js does not retry it, so a game turn would fail. Ask again after a pause. */
+globalThis.fetch = (async (input: any, init?: any) => {
+  const host = new URL(typeof input === 'string' ? input : (input.url ?? String(input))).host;
+  for (let attempt = 0; ; attempt++) {
+    const r = await realFetch(input, init);
+    if (r.status !== 429 || !rpcHosts.has(host) || attempt >= 8) return r;
+    await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+  }
+}) as typeof fetch;
+
 export function provider(): JsonRpcProvider {
   const net = env('NEAR_NETWORK', 'testnet');
   return new JsonRpcProvider({ url: process.env.NEAR_RPC_URL || RPC[net] });

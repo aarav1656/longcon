@@ -24,12 +24,23 @@ test('seed signatures verify under the derived public key and fail when one char
 });
 
 test('terms are read the way the contract reads them', () => {
-  const body = JSON.stringify({ choices: [{ message: { content: '<think>{"verdict":"accept"}</think>ok {"verdict":"refuse","advance":0}' } }] });
-  expect(termsObject(contentOf(body)!)).toEqual({ verdict: 'refuse', advance: 0 });
-  expect(readable(body)).toBe(true);
-  expect(readable('not json')).toBe(false);
-  expect(readable(JSON.stringify({ choices: [{ message: { content: 'no object' } }] }))).toBe(false);
-  expect(readable(JSON.stringify({ choices: [{ message: { content: '{"advance":3}' } }] }))).toBe(false);
+  const body = JSON.stringify({ choices: [{ message: { content: '<think>{"decisions":[]}</think>ok {"decisions":[{"slot":1,"verdict":"refuse","advance":0}]}' } }] });
+  expect(termsObject(contentOf(body)!)).toEqual({ decisions: [{ slot: 1, verdict: 'refuse', advance: 0 }] });
+  expect(readable(body, 1)).toBe(true);
+  expect(readable('not json', 1)).toBe(false);
+  expect(readable(JSON.stringify({ choices: [{ message: { content: 'no object' } }] }), 1)).toBe(false);
+  expect(readable(JSON.stringify({ choices: [{ message: { content: '{"advance":3}' } }] }), 1)).toBe(false);
+});
+
+test('a batch answer must decide every slot, once each, inside the batch', () => {
+  const wrap = (decisions: unknown[]) => JSON.stringify({ choices: [{ message: { content: JSON.stringify({ decisions }) } }] });
+  const d = (slot: number) => ({ slot, verdict: 'accept' });
+  expect(readable(wrap([d(1), d(2)]), 2)).toBe(true);
+  expect(readable(wrap([d(1)]), 2)).toBe(false);
+  expect(readable(wrap([d(1), d(1)]), 2)).toBe(false);
+  expect(readable(wrap([d(1), d(3)]), 2)).toBe(false);
+  expect(readable(wrap([d(1), { slot: 2 }]), 2)).toBe(false);
+  expect(readable(wrap([]), 0)).toBe(false);
 });
 
 test('percentile', () => {

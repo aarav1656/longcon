@@ -50,11 +50,17 @@ export function termsObject(content: string): Record<string, unknown> | null {
   }
 }
 
-/** True when the contract would read a verdict out of this response body. */
-export function readable(body: string): boolean {
+/** True when every slot 1..slots of the batch has a decision the contract can read; otherwise the contract would refuse that traveler. */
+export function readable(body: string, slots: number): boolean {
   const c = contentOf(body);
   const o = c ? termsObject(c) : null;
-  return !!o && (typeof o.verdict === 'string' || typeof o.accept === 'boolean');
+  const list = o && Array.isArray((o as any).decisions) ? ((o as any).decisions as any[]) : [];
+  const seen = new Set<number>();
+  for (const d of list) {
+    const slot = Number(d?.slot);
+    if (Number.isInteger(slot) && slot >= 1 && slot <= slots && typeof d?.verdict === 'string') seen.add(slot);
+  }
+  return slots > 0 && seen.size === slots;
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

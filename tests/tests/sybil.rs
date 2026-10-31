@@ -1,29 +1,6 @@
 use anyhow::Result;
-use futures::future::join_all;
 use longcon_tests::*;
-use near_workspaces::types::NearToken;
 use serde_json::{json, Value};
-
-/// Every sub-account a player uses is a fresh identity, so the bound has to come from the ledger and
-/// not from who is asking.
-async fn fresh_players(w: &World, prefix: &str, n: usize) -> Result<Vec<near_workspaces::Account>> {
-    let root = w.worker.root_account()?;
-    let mut out = vec![];
-    for chunk in (0..n).collect::<Vec<_>>().chunks(25) {
-        let mut accs = vec![];
-        for i in chunk {
-            // one signer, so creation is sequential; the joins below are parallel because each account signs its own
-            accs.push(root.create_subaccount(&format!("{prefix}{i}")).initial_balance(NearToken::from_millinear(300)).transact().await?.into_result()?);
-        }
-        let id = w.contract.id().clone();
-        let joined = join_all(accs.iter().map(|a| a.call(&id, "join").gas(near_workspaces::types::Gas::from_tgas(30)).transact())).await;
-        for j in joined {
-            j?.into_result()?;
-        }
-        out.extend(accs);
-    }
-    Ok(out)
-}
 
 /// One wave: every account queues an offer, then the road seals and answers batch after batch.
 async fn run_wave(w: &World, accounts: &[near_workspaces::Account], merchant: u8, decision: &str) -> Result<Vec<Value>> {
@@ -69,7 +46,7 @@ async fn run_wave(w: &World, accounts: &[near_workspaces::Account], merchant: u8
 async fn a_thousand_fresh_accounts_cannot_take_more_than_the_daily_cap_from_one_merchant() -> Result<()> {
     let n: usize = std::env::var("SYBIL_ACCOUNTS").ok().and_then(|v| v.parse().ok()).unwrap_or(1000);
     let w = World::new(Cfg::default()).await?;
-    let accounts = fresh_players(&w, "sy", n).await?;
+    let accounts = w.fresh_players("sy", n).await?;
     let decision = terms("accept", 15, 15, 1, "future_cargo");
     let mut committed = 0u64;
     let mut principal = 0u64;

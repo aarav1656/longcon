@@ -53,7 +53,7 @@ async function nearAiSignature(
  * model:sha256(request):sha256(response). Retries the model while the answer is unreadable and
  * the deadline allows.
  */
-export async function answer(cfg: LlmCfg, requestBody: string, deadline: number): Promise<Answered> {
+export async function answer(cfg: LlmCfg, requestBody: string, slots: number, deadline: number): Promise<Answered> {
   const reqHash = sha256Hex(requestBody);
   let attempts = 0;
   let lastErr = 'no attempt';
@@ -67,8 +67,8 @@ export async function answer(cfg: LlmCfg, requestBody: string, deadline: number)
       await sleep(1000);
       continue;
     }
-    if (!readable(text)) {
-      lastErr = 'answer had no readable verdict';
+    if (!readable(text, slots)) {
+      lastErr = 'answer did not decide every slot';
       continue;
     }
     const respHash = sha256Hex(text);

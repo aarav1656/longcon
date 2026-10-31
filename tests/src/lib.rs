@@ -7,6 +7,7 @@ use near_workspaces::network::Sandbox;
 use near_workspaces::result::ExecutionFinalResult;
 use near_workspaces::types::{Gas, NearToken};
 use near_workspaces::{Account, AccountId, Contract, Worker};
+use futures::future::join_all;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
@@ -96,6 +97,27 @@ impl World {
         let acc = root.create_subaccount(name).initial_balance(NearToken::from_near(2)).transact().await?.into_result()?;
         acc.call(self.contract.id(), "join").max_gas().transact().await?.into_result()?;
         Ok(acc)
+    }
+
+
+    /// `n` joined accounts, each a fresh identity: a bound has to come from the ledger and not from who is asking.
+    pub async fn fresh_players(&self, prefix: &str, n: usize) -> Result<Vec<Account>> {
+        let root = self.worker.root_account()?;
+        let mut out = vec![];
+        for chunk in (0..n).collect::<Vec<_>>().chunks(25) {
+            let mut accs = vec![];
+            for i in chunk {
+                // one signer, so creation is sequential; the joins below are parallel because each account signs its own
+                accs.push(root.create_subaccount(&format!("{prefix}{i}")).initial_balance(NearToken::from_millinear(300)).transact().await?.into_result()?);
+            }
+            let id = self.contract.id().clone();
+            let joined = join_all(accs.iter().map(|a| a.call(&id, "join").gas(near_workspaces::types::Gas::from_tgas(30)).transact())).await;
+            for j in joined {
+                j?.into_result()?;
+            }
+            out.extend(accs);
+        }
+        Ok(out)
     }
 
     pub async fn state(&self) -> Result<Value> {

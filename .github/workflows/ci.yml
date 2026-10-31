@@ -18,9 +18,10 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-near
+      - uses: cargo-bins/cargo-binstall@main
+      - name: install cargo-near
+        run: |
+          cargo binstall -y --locked cargo-near || cargo install --locked cargo-near
       - name: layout check
         run: |
           if [ ! -f Cargo.toml ]; then

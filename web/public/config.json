@@ -1,0 +1,7 @@
+{
+  "contract_id": "longcon-game.testnet",
+  "network": "testnet",
+  "rpc": "https://test.rpc.fastnear.com",
+  "relayer": "http://127.0.0.1:8787",
+  "explorer": "https://testnet.nearblocks.io"
+}

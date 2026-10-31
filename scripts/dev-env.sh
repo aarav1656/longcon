@@ -3,7 +3,12 @@
 #   PREFIX     account prefix, default longcon (accounts <PREFIX>-game, -owner, -worker, -relay .testnet)
 #   LLM_*      the OpenAI compatible endpoint the merchants think with
 root="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
-[ -f "$root/.env" ] && { set -a; . "$root/.env"; set +a; }
+# .env supplies defaults; anything already exported in the shell wins
+if [ -f "$root/.env" ]; then
+  while IFS== read -r k v; do
+    case "$k" in [A-Z_]*) [ -z "${!k+x}" ] && export "$k=$v" ;; esac
+  done < "$root/.env"
+fi
 export NEAR_NETWORK="${NEAR_NETWORK:-testnet}"
 PREFIX="${PREFIX:-longcon}"
 cred() { jq -r .private_key "$HOME/.near-credentials/$NEAR_NETWORK/$1.$NEAR_NETWORK.json"; }

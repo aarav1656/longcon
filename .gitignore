@@ -12,3 +12,4 @@ web/dist/
 *.jsonl
 .env
 *.db
+!.env.example

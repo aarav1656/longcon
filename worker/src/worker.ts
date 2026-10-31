@@ -32,16 +32,18 @@ interface Pending { id: number; merchant: number; batch: number | null; block: n
 interface BatchView { id: number; merchant: number; offer_ids: number[]; request_hash: string; block: number }
 
 /** Sealing is open to anyone; the contract only accepts it once the oldest waiting offer has aged the window. */
-async function seal(merchant: number, waiting: Pending[], head: number) {
+async function seal(merchant: number, waiting: Pending[], head: number): Promise<boolean> {
   const oldest = Math.min(...waiting.map((o) => o.block));
-  if (waiting.length < MAX_BATCH && head < oldest + BATCH_WINDOW_BLOCKS) return;
-  if (sealing.has(merchant)) return;
+  if (waiting.length < MAX_BATCH && head < oldest + BATCH_WINDOW_BLOCKS) return false;
+  if (sealing.has(merchant)) return false;
   sealing.add(merchant);
   try {
     await acc.callFunction({ contractId, methodName: 'seal_batch', args: { merchant }, gas: 100_000_000_000_000n, deposit: 0n });
     log({ ev: 'sealed', merchant, waiting: waiting.length });
+    return true;
   } catch (e: any) {
     log({ ev: 'seal_failed', merchant, error: String(e?.message ?? e).slice(0, 200) });
+    return false;
   } finally {
     sealing.delete(merchant);
   }
@@ -66,7 +68,7 @@ async function handle(b: BatchView, head: number, oldestOffer: number) {
 }
 
 async function tick() {
-  const [pending, batches, block] = await Promise.all([
+  const [pending, listed, block] = await Promise.all([
     view<Pending[]>(p, contractId, 'pending_offers'),
     view<BatchView[]>(p, contractId, 'open_batches'),
     p.viewBlock({ finality: 'final' }),
@@ -74,11 +76,15 @@ async function tick() {
   const head = block.header.height;
   const byMerchant = new Map<number, Pending[]>();
   for (const o of pending.filter((o) => o.batch === null)) byMerchant.set(o.merchant, [...(byMerchant.get(o.merchant) ?? []), o]);
-  for (const [merchant, waiting] of byMerchant) await seal(merchant, waiting, head);
+  let sealed = false;
+  for (const [merchant, waiting] of byMerchant) sealed = (await seal(merchant, waiting, head)) || sealed;
+  // a batch sealed just now is answered in this pass instead of waiting a poll interval
+  const batches = sealed ? await view<BatchView[]>(p, contractId, 'open_batches') : listed;
+  const offers = sealed ? await view<Pending[]>(p, contractId, 'pending_offers') : pending;
   for (const b of batches) {
     if (inflight.has(b.id)) continue;
     inflight.add(b.id);
-    const oldest = Math.min(...pending.filter((o) => o.batch === b.id).map((o) => o.block), b.block);
+    const oldest = Math.min(...offers.filter((o) => o.batch === b.id).map((o) => o.block), b.block);
     handle(b, head, oldest)
       .catch((e) => log({ ev: 'failed', batch: b.id, error: String(e?.message ?? e).slice(0, 300) }))
       .finally(() => inflight.delete(b.id));

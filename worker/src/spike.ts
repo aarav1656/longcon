@@ -54,7 +54,7 @@ async function terminal(t: Traveler, since: number, timeoutMs = 170_000): Promis
       const offers: any[] = await view(p, contractId, 'offers_of', { account_id: t.id, limit: 1 });
       return { ms: Date.now() - since, offer: offers[0] };
     }
-    await sleep(1500);
+    await sleep(700);
   }
   throw new Error(`offer for ${t.id.slice(0, 8)} never reached a terminal state in ${timeoutMs} ms`);
 }
@@ -68,7 +68,7 @@ async function setModel(model: string) {
 let child: ReturnType<typeof Bun.spawn> | null = null;
 function startWorker(model: string, metrics: string) {
   child = Bun.spawn(['bun', 'run', 'src/worker.ts'], {
-    env: { ...process.env, LLM_MODEL: model, METRICS_FILE: metrics, SIGN_MODE: 'worker', POLL_MS: process.env.POLL_MS ?? '2500' },
+    env: { ...process.env, LLM_MODEL: model, METRICS_FILE: metrics, SIGN_MODE: 'worker', POLL_MS: process.env.POLL_MS ?? '1200' },
     stdout: 'ignore',
     stderr: 'inherit',
   });

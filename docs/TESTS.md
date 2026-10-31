@@ -1,3 +1,27 @@
+# Tests and mutation checks
+
+## Suite
+
+Command: `cargo test --workspace --no-fail-fast` (the sandbox binaries build the real wasm with `scripts/build-wasm.sh` and run it through real receipts in near-workspaces).
+
+| Binary | Passed |
+|---|---|
+| unit (`contract`) | 23 |
+| attestation | 7 |
+| batch | 11 |
+| clamps | 11 |
+| guards | 6 |
+| lifecycle | 6 |
+| rumours | 2 |
+| sybil | 2 |
+| total | 68 passed, 0 failed |
+
+Client tests: `(cd worker && bun test ./test) && (cd web && bun test ./test)`.
+
+## Mutation checks
+
+Command: `python3 scripts/mutate.py` (one row: `python3 scripts/mutate.py M25`). For every guard that moves or gates value the script breaks the guard in the source, runs the test meant to catch it and requires red, restores the file byte for byte, runs the same test and requires green. Result: 43 of 43 guards KILLED, 0 survived. Red and green columns are the cargo output.
+
 | Id | Guard broken | File | Test that must go red | Red run | Green after restore | Result |
 |---|---|---|---|---|---|---|
 | M01 | join: one stipend per account | `contract/src/lib.rs` | `guards::joining_twice_does_not_mint_a_second_stipend` | test joining_twice_does_not_mint_a_second_stipend ... FAILED / thread 'joining_twice_does_not_mint_a_second_stipend' (16382948) panicked at tests/tests/guards.rs:9:90: / test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 54.18s | test joining_twice_does_not_mint_a_second_stipend ... ok / test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 41.61s | KILLED |

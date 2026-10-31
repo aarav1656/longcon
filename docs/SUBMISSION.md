@@ -11,7 +11,7 @@ Product: Long Con is a free browser game on a road of three AI merchants who len
 
 How NEAR fits: the contract builds each merchant's request and holds the player's offer in a yield for up to 200 blocks; a timeout refunds the bond. It accepts an answer only if an ed25519 signature over model, request hash and response hash verifies on chain against the key from NEAR AI Cloud's attestation report for that model. Contract rules then apply whatever the model said: bond plus earned line, 15 gold per merchant per due day, 30% of a merchant's capital, interest at most 50%, quotes that cannot be traded in a circle. Offers for one merchant are sealed into one batch, so the model weighs every waiting pitch together. Players hold a browser key as a NEAR implicit account and a relayer pays gas through NEP-366 delegate actions: no wallet popup.
 
-Try it: the README has testnet run steps and one command for 44 sandbox tests on the real wasm (signature tampering, every cap, batch fairness, a 1,000-account Sybil wave), plus a mutation table: each guard broken, test red, guard restored.
+Try it: the README has testnet run steps and one command for 45 sandbox tests on the real wasm (signature tampering, every cap, batch fairness, a 1,000-account Sybil wave), plus a mutation table: each guard broken, test red, guard restored.
 ```
 
 ## Tracks

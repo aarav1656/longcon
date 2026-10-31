@@ -78,10 +78,33 @@ pub fn unparsable() -> Proposed {
     }
 }
 
-pub fn parse_terms(response_body: &str) -> Proposed {
-    let Some(obj) = content_of(response_body).and_then(|c| object_of(&c)) else {
-        return unparsable();
-    };
+/// One decision per slot of a batch, plus the grain prices the merchant set once for the batch.
+/// A slot the model skipped, repeated or garbled is a refusal, never a guess.
+pub struct BatchTerms {
+    pub decisions: Vec<Proposed>,
+    pub buy_price: Option<u64>,
+    pub sell_price: Option<u64>,
+}
+
+pub fn parse_batch(response_body: &str, slots: usize) -> BatchTerms {
+    let obj = content_of(response_body).and_then(|c| object_of(&c));
+    let mut decisions: Vec<Option<Proposed>> = vec![None; slots];
+    if let Some(list) = obj.as_ref().and_then(|o| o["decisions"].as_array()) {
+        for d in list {
+            let slot = num(&d["slot"]).unwrap_or(0) as usize;
+            if (1..=slots).contains(&slot) && decisions[slot - 1].is_none() {
+                decisions[slot - 1] = Some(proposed_from(d));
+            }
+        }
+    }
+    BatchTerms {
+        decisions: decisions.into_iter().map(|d| d.unwrap_or_else(unparsable)).collect(),
+        buy_price: obj.as_ref().and_then(|o| num(&o["buy_price"])),
+        sell_price: obj.as_ref().and_then(|o| num(&o["sell_price"])),
+    }
+}
+
+fn proposed_from(obj: &Value) -> Proposed {
     let accept = match &obj["verdict"] {
         Value::String(s) => s.trim().eq_ignore_ascii_case("accept"),
         _ => obj["accept"].as_bool().unwrap_or(false),
@@ -101,6 +124,10 @@ pub fn parse_terms(response_body: &str) -> Proposed {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse_terms(body: &str) -> Proposed {
+        content_of(body).and_then(|c| object_of(&c)).map(|o| proposed_from(&o)).unwrap_or_else(unparsable)
+    }
 
     fn body(content: &str) -> String {
         serde_json::json!({"id":"chatcmpl-1","choices":[{"message":{"role":"assistant","content":content}}]}).to_string()
@@ -144,6 +171,25 @@ mod tests {
         assert_eq!(p.class, ConClass::Other);
         assert!(p.reason.len() <= REASON_MAX_BYTES);
         assert!(p.reason.chars().all(|c| c == 'é'));
+    }
+
+    #[test]
+    fn a_batch_answer_is_read_per_slot_and_a_missing_slot_is_a_refusal() {
+        let c = r#"{"decisions":[{"slot":2,"verdict":"accept","advance":7,"repay":8,"due_days":2,"class":"urgency"},{"slot":1,"verdict":"refuse","advance":0,"repay":0,"due_days":1},{"slot":2,"verdict":"accept","advance":99}],"buy_price":4,"sell_price":6}"#;
+        let t = parse_batch(&body(c), 3);
+        assert_eq!(t.decisions.len(), 3);
+        assert!(!t.decisions[0].accept);
+        assert_eq!((t.decisions[1].accept, t.decisions[1].advance), (true, 7), "the first decision for a slot wins");
+        assert!(!t.decisions[2].accept, "slot 3 was never answered");
+        assert_eq!((t.buy_price, t.sell_price), (Some(4), Some(6)));
+    }
+
+    #[test]
+    fn a_slot_outside_the_batch_is_ignored_and_garbage_refuses_everyone() {
+        let t = parse_batch(&body(r#"{"decisions":[{"slot":0,"verdict":"accept","advance":5},{"slot":9,"verdict":"accept","advance":5}]}"#), 2);
+        assert!(t.decisions.iter().all(|d| !d.accept));
+        let g = parse_batch("not json", 2);
+        assert!(g.decisions.iter().all(|d| !d.accept) && g.buy_price.is_none());
     }
 
     #[test]

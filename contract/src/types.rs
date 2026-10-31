@@ -127,9 +127,38 @@ pub struct Offer {
     pub day: u32,
     pub block: u64,
     pub status: OfferStatus,
+    /// The batch this offer was sealed into; `None` while it waits in the merchant's queue.
+    pub batch: Option<u64>,
+    /// Hash of the batch request the merchant answered. Empty until sealed.
+    pub request_hash: String,
+    /// sha256 of model, temperature and system prompt: the merchant's pinned configuration.
+    pub config_hash: String,
+    pub outcome: Option<Outcome>,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchStatus {
+    Open,
+    Resolved,
+}
+
+/// The offers one merchant weighs together. The merchant sees every traveler below before any
+/// of them is decided, and they are decided in ascending offer id, so arrival order inside the
+/// window buys nothing.
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug)]
+pub struct Batch {
+    pub id: u64,
+    pub merchant: u8,
+    pub offer_ids: Vec<u64>,
+    pub day: u32,
+    pub block: u64,
+    pub status: BatchStatus,
     pub request_body: String,
     pub request_hash: String,
-    pub outcome: Option<Outcome>,
+    pub config_hash: String,
 }
 
 #[near(serializers = [json, borsh])]
@@ -149,6 +178,7 @@ pub struct Debt {
     pub model: String,
     pub request_hash: String,
     pub response_hash: String,
+    pub config_hash: String,
 }
 
 /// A landed con: a debt that defaulted. Merchants read these, delayed by caravan distance.
@@ -168,6 +198,7 @@ pub struct ConRecord {
     pub model: String,
     pub request_hash: String,
     pub response_hash: String,
+    pub config_hash: String,
 }
 
 #[near(serializers = [json, borsh])]

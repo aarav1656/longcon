@@ -140,7 +140,7 @@ impl World {
         for _ in 0..80 {
             let pending = self.view("pending_offers", json!({})).await?;
             if let Some(p) = pending.as_array().and_then(|a| a.iter().find(|p| p["player"] == json!(who.id()))) {
-                return Ok(OpenOffer { status, id: p["id"].as_u64().unwrap() });
+                return Ok(OpenOffer { status, id: p["id"].as_u64().unwrap(), merchant });
             }
             if let std::task::Poll::Ready(r) = status.status().await? {
                 return Err(anyhow!("offer tx failed: {:?}", r.failures()));
@@ -150,23 +150,56 @@ impl World {
         Err(anyhow!("offer never became pending"))
     }
 
-    /// Fetch the request, sign `content` as the model, relay it. Returns the npc_resume result.
+    /// Let the batch window pass, then freeze the merchant's queue. Returns the batch id.
+    pub async fn seal(&self, merchant: u8) -> Result<u64> {
+        self.worker.fast_forward(BATCH_WINDOW_BLOCKS + 1).await?;
+        let r = self.seal_raw(merchant).await?.into_result().context("seal_batch")?;
+        Ok(r.json::<u64>()?)
+    }
+
+    pub async fn seal_raw(&self, merchant: u8) -> Result<ExecutionFinalResult> {
+        let relayer = self.worker.root_account()?;
+        Ok(relayer.call(self.contract.id(), "seal_batch").args_json(json!({"merchant": merchant})).max_gas().transact().await?)
+    }
+
+    /// The batch an offer sits in, sealing its merchant's queue first when it is still waiting.
+    pub async fn batch_of(&self, o: &OpenOffer) -> Result<u64> {
+        let offer = self.view("offer_by_id", json!({"offer_id": o.id})).await?;
+        match offer["batch"].as_u64() {
+            Some(b) => Ok(b),
+            None => self.seal(o.merchant).await,
+        }
+    }
+
+    /// The exact request the worker would POST for this offer's batch.
+    pub async fn body_of(&self, o: &OpenOffer) -> Result<(u64, String)> {
+        let b = self.batch_of(o).await?;
+        let body = self.view("batch_body", json!({"batch_id": b})).await?;
+        Ok((b, body.as_str().unwrap().to_string()))
+    }
+
+    /// Fetch the batch request, sign `content` as the model's decision for this single offer, relay it.
     pub async fn answer(&self, o: &OpenOffer, content: &str) -> Result<ExecutionFinalResult> {
-        self.answer_id(o.id, content).await
+        let (batch, body) = self.body_of(o).await?;
+        self.answer_batch_body(batch, &body, &[content.to_string()]).await
     }
 
-    /// For a caller that already moved the offer status future out of its `OpenOffer`.
-    pub async fn answer_id(&self, id: u64, content: &str) -> Result<ExecutionFinalResult> {
-        let body: String = self.view("request_body", json!({"offer_id": id})).await?.as_str().unwrap().to_string();
-        let (response, signature) = self.signed(&body, content);
-        self.relay(id, &response, &signature, "provider_tee").await
+    /// Sign one decision per slot, in the batch's slot order, and relay the batch answer.
+    pub async fn answer_batch(&self, batch: u64, contents: &[String]) -> Result<ExecutionFinalResult> {
+        let body = self.view("batch_body", json!({"batch_id": batch})).await?;
+        self.answer_batch_body(batch, body.as_str().unwrap(), contents).await
     }
 
-    pub async fn relay(&self, offer_id: u64, response: &str, signature: &str, kind: &str) -> Result<ExecutionFinalResult> {
+    async fn answer_batch_body(&self, batch: u64, body: &str, contents: &[String]) -> Result<ExecutionFinalResult> {
+        let (response, signature) = self.signed(body, &batch_content(contents));
+        self.relay(batch, &response, &signature, "provider_tee").await
+    }
+
+    pub async fn relay(&self, batch_id: u64, response: &str, signature: &str, kind: &str) -> Result<ExecutionFinalResult> {
         let relayer = self.worker.root_account()?;
         Ok(relayer
-            .call(self.contract.id(), "npc_resume")
-            .args_json(json!({"offer_id": offer_id, "response": response, "signature": signature, "kind": kind}))
+            .call(self.contract.id(), "npc_resume_batch")
+            .args_json(json!({"batch_id": batch_id, "response": response, "signature": signature, "kind": kind}))
             .max_gas()
             .transact()
             .await?)
@@ -185,6 +218,29 @@ impl World {
 pub struct OpenOffer {
     pub status: near_workspaces::operations::TransactionStatus,
     pub id: u64,
+    pub merchant: u8,
+}
+
+pub const BATCH_WINDOW_BLOCKS: u64 = 6;
+
+/// A batch answer from per-slot decision objects (as produced by `terms`). The merchant's grain
+/// prices, when a decision carries them, move to the top level where the prompt asks for them.
+pub fn batch_content(decisions: &[String]) -> String {
+    let mut list = vec![];
+    let (mut buy, mut sell) = (None, None);
+    for (i, d) in decisions.iter().enumerate() {
+        let Ok(mut v) = serde_json::from_str::<Value>(d) else { return d.clone() }; // free text stays free text
+        v["slot"] = json!(i + 1);
+        if let Some(o) = v.as_object_mut() {
+            if let Some(b) = o.remove("buy_price") { buy.get_or_insert(b); }
+            if let Some(x) = o.remove("sell_price") { sell.get_or_insert(x); }
+        }
+        list.push(v);
+    }
+    let mut out = json!({"decisions": list});
+    if let Some(b) = buy { out["buy_price"] = b; }
+    if let Some(x) = sell { out["sell_price"] = x; }
+    out.to_string()
 }
 
 pub fn terms(verdict: &str, advance: u64, repay: u64, due_days: u64, class: &str) -> String {

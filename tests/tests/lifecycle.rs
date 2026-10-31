@@ -18,8 +18,10 @@ async fn a_merchant_that_never_answers_times_out_and_the_bond_comes_back() -> Re
     assert_eq!(pv["locked_bonds"], json!(0));
     assert_eq!(pv["pending_offer"], Value::Null);
     assert_eq!(w.view("pending_offers", json!({})).await?, json!([]));
-    let late = failure_text(w.relay(o.id, "{}", &"00".repeat(64), "provider_tee").await).expect("late answer must fail");
-    assert!(late.contains("offer is not awaiting an answer"), "{late}");
+    let sealed = failure_text(w.seal_raw(0).await).expect("a timed-out offer leaves the queue");
+    assert!(sealed.contains("no offers are waiting"), "{sealed}");
+    let late = failure_text(w.relay(1, "{}", &"00".repeat(64), "provider_tee").await).expect("nothing was ever sealed");
+    assert!(late.contains("no such batch"), "{late}");
     w.audit().await?;
     Ok(())
 }
@@ -100,8 +102,8 @@ async fn news_of_a_landed_con_travels_one_town_per_day() -> Result<()> {
             // the prompt the model would receive on this day, read from a real pending offer
             let p = w.player(&format!("probe{step}{merchant}")).await?;
             let o = w.open_offer(&p, merchant, 5, 5, "probe").await?;
-            let body = w.view("request_body", json!({"offer_id": o.id})).await?;
-            let in_prompt = body.as_str().unwrap().contains(marker);
+            let (_, body) = w.body_of(&o).await?;
+            let in_prompt = body.contains(marker);
             assert_eq!(!news.as_array().unwrap().is_empty(), in_prompt, "news_at and the prompt must agree for {name}");
             row.push((name, in_prompt));
             // settle the probe so the next one can open

@@ -25,6 +25,13 @@ pub const SELL_MAX: u64 = 12;
 pub const BUY_MAX: u64 = SELL_MAX - 1;
 
 pub const RECORDS_IN_PROMPT: usize = 4;
+/// A landed con stops being news this many days after it landed. Stale or false information
+/// would otherwise persist in every later prompt.
+pub const NEWS_TTL_DAYS: u32 = 8;
+/// Offers for one merchant wait this many blocks (about 3.5 s) so that a batch is weighed together.
+pub const BATCH_WINDOW_BLOCKS: u64 = 6;
+pub const MAX_BATCH: usize = 8;
+pub const MAX_QUEUE: usize = 64;
 pub const RECORD_SCAN: u64 = 64;
 
 pub const TOWNS: [&str; 3] = ["Millford", "Pellgate", "Oskmoor"];

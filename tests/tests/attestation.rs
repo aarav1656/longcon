@@ -34,15 +34,15 @@ async fn one_altered_response_byte_is_rejected_and_the_yield_stays_open() -> Res
     let w = World::new(Cfg::default()).await?;
     let p = w.player("alice").await?;
     let o = w.open_offer(&p, 0, 5, 5, "front me five").await?;
-    let body = w.view("request_body", json!({"offer_id": o.id})).await?;
-    let (resp, sig) = w.signed(body.as_str().unwrap(), &terms("accept", 5, 6, 3, "other"));
+    let (batch, body) = w.body_of(&o).await?;
+    let (resp, sig) = w.signed(&body, &batch_content(&[terms("accept", 5, 6, 3, "other")]));
     let altered = resp.replacen("\"advance\\\":5", "\"advance\\\":9", 1);
     assert_ne!(altered, resp, "the fixture must actually change a byte");
-    let bad = failure_text(w.relay(o.id, &altered, &sig, "provider_tee").await).expect("altered body must fail");
+    let bad = failure_text(w.relay(batch, &altered, &sig, "provider_tee").await).expect("altered body must fail");
     println!("altered response: {}", bad.lines().find(|l| l.contains("signature")).unwrap_or(&bad));
     assert!(bad.contains("signature does not verify"), "{bad}");
     assert_eq!(w.view("pending_offers", json!({})).await?.as_array().unwrap().len(), 1, "still pending");
-    let ok = w.relay(o.id, &resp, &sig, "provider_tee").await?;
+    let ok = w.relay(batch, &resp, &sig, "provider_tee").await?;
     assert!(ok.is_success(), "{:?}", ok.failures());
     assert_eq!(o.status.await?.json::<serde_json::Value>()?["status"], json!("committed"));
     Ok(())
@@ -53,12 +53,12 @@ async fn a_signature_from_an_unregistered_key_is_rejected() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let p = w.player("alice").await?;
     let o = w.open_offer(&p, 0, 5, 5, "front me five").await?;
-    let body = w.view("request_body", json!({"offer_id": o.id})).await?;
-    let (resp, _) = w.signed(body.as_str().unwrap(), &terms("accept", 5, 6, 3, "other"));
+    let (batch, body) = w.body_of(&o).await?;
+    let (resp, _) = w.signed(&body, &batch_content(&[terms("accept", 5, 6, 3, "other")]));
     let rogue = SigningKey::generate(&mut rand::rngs::OsRng);
-    let text = format!("{MODEL}:{}:{}", sha256_hex(body.as_str().unwrap()), sha256_hex(&resp));
+    let text = format!("{MODEL}:{}:{}", sha256_hex(&body), sha256_hex(&resp));
     let sig = hex::encode(rogue.sign(text.as_bytes()).to_bytes());
-    let bad = failure_text(w.relay(o.id, &resp, &sig, "provider_tee").await).expect("rogue key must fail");
+    let bad = failure_text(w.relay(batch, &resp, &sig, "provider_tee").await).expect("rogue key must fail");
     assert!(bad.contains("signature does not verify"), "{bad}");
     Ok(())
 }
@@ -70,12 +70,14 @@ async fn a_signature_is_bound_to_the_request_the_contract_built() -> Result<()> 
     let b = w.player("bob").await?;
     let oa = w.open_offer(&a, 0, 5, 5, "alice pitch").await?;
     let ob = w.open_offer(&b, 1, 5, 5, "bob pitch").await?;
-    let body_a = w.view("request_body", json!({"offer_id": oa.id})).await?;
-    // a perfectly valid signed answer to Alice's request, replayed against Bob's offer
-    let (resp, sig) = w.signed(body_a.as_str().unwrap(), &terms("accept", 5, 6, 3, "other"));
-    let bad = failure_text(w.relay(ob.id, &resp, &sig, "provider_tee").await).expect("cross-offer replay must fail");
+    let (batch_a, body_a) = w.body_of(&oa).await?;
+    let (batch_b, _) = w.body_of(&ob).await?;
+    assert_ne!(batch_a, batch_b);
+    // a perfectly valid signed answer to Alice's request, replayed against Bob's batch
+    let (resp, sig) = w.signed(&body_a, &batch_content(&[terms("accept", 5, 6, 3, "other")]));
+    let bad = failure_text(w.relay(batch_b, &resp, &sig, "provider_tee").await).expect("cross-batch replay must fail");
     assert!(bad.contains("signature does not verify"), "{bad}");
-    let ok = w.relay(oa.id, &resp, &sig, "provider_tee").await?;
+    let ok = w.relay(batch_a, &resp, &sig, "provider_tee").await?;
     assert!(ok.is_success());
     Ok(())
 }
@@ -85,16 +87,16 @@ async fn gateway_kind_needs_its_own_registered_key() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let p = w.player("alice").await?;
     let o = w.open_offer(&p, 0, 5, 5, "front me five").await?;
-    let body = w.view("request_body", json!({"offer_id": o.id})).await?;
-    let (resp, sig) = w.signed(body.as_str().unwrap(), &terms("accept", 5, 6, 3, "other"));
-    let bad = failure_text(w.relay(o.id, &resp, &sig, "gateway").await).expect("no gateway key registered");
+    let (batch, body) = w.body_of(&o).await?;
+    let (resp, sig) = w.signed(&body, &batch_content(&[terms("accept", 5, 6, 3, "other")]));
+    let bad = failure_text(w.relay(batch, &resp, &sig, "gateway").await).expect("no gateway key registered");
     assert!(bad.contains("no signer registered"), "{bad}");
     // register a gateway key and sign the two-field text
     let gw = SigningKey::generate(&mut rand::rngs::OsRng);
     w.owner_call("set_signer", json!({"name": "gateway", "key_hex": hex::encode(gw.verifying_key().to_bytes())})).await?.into_result()?;
-    let text = format!("{}:{}", sha256_hex(body.as_str().unwrap()), sha256_hex(&resp));
+    let text = format!("{}:{}", sha256_hex(&body), sha256_hex(&resp));
     let gsig = hex::encode(gw.sign(text.as_bytes()).to_bytes());
-    let ok = w.relay(o.id, &resp, &gsig, "gateway").await?;
+    let ok = w.relay(batch, &resp, &gsig, "gateway").await?;
     assert!(ok.is_success(), "{:?}", ok.failures());
     let out = o.status.await?.json::<serde_json::Value>()?;
     assert_eq!(out["signer"], json!("gateway"));
@@ -106,11 +108,11 @@ async fn a_settled_offer_cannot_be_resumed_again() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let p = w.player("alice").await?;
     let o = w.open_offer(&p, 0, 5, 5, "front me five").await?;
-    let body = w.view("request_body", json!({"offer_id": o.id})).await?;
-    let (resp, sig) = w.signed(body.as_str().unwrap(), &terms("accept", 5, 6, 3, "other"));
-    assert!(w.relay(o.id, &resp, &sig, "provider_tee").await?.is_success());
+    let (batch, body) = w.body_of(&o).await?;
+    let (resp, sig) = w.signed(&body, &batch_content(&[terms("accept", 5, 6, 3, "other")]));
+    assert!(w.relay(batch, &resp, &sig, "provider_tee").await?.is_success());
     o.status.await?;
-    let again = failure_text(w.relay(o.id, &resp, &sig, "provider_tee").await).expect("replay must fail");
+    let again = failure_text(w.relay(batch, &resp, &sig, "provider_tee").await).expect("replay must fail");
     assert!(again.contains("not awaiting an answer"), "{again}");
     assert_eq!(w.merchant(0).await?["outstanding"], json!(5), "no second debt");
     w.audit().await?;

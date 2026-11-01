@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs
 import { actions as A, KeyPair, KeyPairSigner, Account } from 'near-api-js';
 import { account, env, provider, view } from './chain.ts';
 import { percentile, publicKeyHex, sleep } from './lib.ts';
-import { HITS, WARM, WARM_RETRY, hitAsk, tally, type Trial } from './arms.ts';
+import { HITS, WARM, WARM_RETRY, hitAsk, offerFinished, tally, type Trial } from './arms.ts';
 
 /**
  * Measurements against the real contract on testnet and the real model endpoint in .env.
@@ -51,10 +51,10 @@ async function submitOffer(t: Traveler, merchant: number, ask: number, bond: num
   return t0;
 }
 
-async function terminal(t: Traveler, since: number, timeoutMs = 170_000, pollMs = 700): Promise<{ ms: number; offer: any }> {
+async function terminal(t: Traveler, since: number, timeoutMs = 170_000, pollMs = 700, sent = 1): Promise<{ ms: number; offer: any }> {
   while (Date.now() - since < timeoutMs) {
     const pv: any = await view(p, contractId, 'player', { account_id: t.id });
-    if (pv && pv.pending_offer === null && pv.settled >= 1) {
+    if (offerFinished(pv, sent)) {
       const offers: any[] = await view(p, contractId, 'offers_of', { account_id: t.id, limit: 1 });
       return { ms: Date.now() - since, offer: offers[0] };
     }
@@ -234,12 +234,14 @@ const latestOffer = async (t: Traveler): Promise<any> => {
 async function longTrial(arm: string, merchant: number, hitIdx: number): Promise<Trial> {
   const hit = HITS[hitIdx % HITS.length];
   const row: Trial = { arm, hit: hit.key, warm: 'error' };
+  let t: Traveler | undefined;
   try {
-    const t = await newTraveler(LONG_FUND);
+    t = await newTraveler(LONG_FUND);
     let repaid = 0;
+    let sent = 0;
     for (const w of [WARM, WARM_RETRY]) {
       const t0 = await submitOffer(t, merchant, w.ask, w.bond, w.text);
-      await terminal(t, t0, 170_000, 1800);
+      await terminal(t, t0, 170_000, 1800, ++sent);
       const o = await latestOffer(t);
       if (o.status === 'committed' && o.outcome?.debt_id != null) {
         await t.acc.callFunction({ contractId, methodName: 'repay_debt', args: { debt_id: o.outcome.debt_id }, gas: 30_000_000_000_000n, deposit: 0n });
@@ -251,12 +253,23 @@ async function longTrial(arm: string, merchant: number, hitIdx: number): Promise
     row.warm = 'repaid';
     const ask = hitAsk(WARM.bond, repaid);
     const t0 = await submitOffer(t, merchant, ask, WARM.bond, hit.text(ask));
-    await terminal(t, t0, 170_000, 1800);
+    await terminal(t, t0, 170_000, 1800, ++sent);
     const o = await latestOffer(t);
     return { ...row, hitStatus: o.status, proposed: o.outcome?.proposed_advance, advance: o.outcome?.advance, class: o.outcome?.class };
   } catch (e: any) {
     out({ ev: 'longcon_trial_error', arm, merchant, hit: hit.key, error: String(e?.message ?? e).slice(0, 200) });
     return row;
+  } finally {
+    if (t) await sweep(t);
+  }
+}
+
+/** Return what a finished traveler has left to the owner, so a run costs its gas and not its float. */
+async function sweep(t: Traveler) {
+  try {
+    await t.acc.signAndSendTransaction({ receiverId: t.id, actions: [A.deleteAccount(owner.accountId)], waitUntil: 'INCLUDED' } as any);
+  } catch (e: any) {
+    out({ ev: 'sweep_failed', traveler: t.id.slice(0, 8), error: String(e?.message ?? e).slice(0, 160) });
   }
 }
 

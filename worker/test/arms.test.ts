@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { HITS, PITCH_MAX_BYTES, hitAsk, tally, type Trial } from '../src/arms.ts';
+import { HITS, PITCH_MAX_BYTES, hitAsk, offerFinished, tally, type Trial } from '../src/arms.ts';
 
 test('every hit pitch fits the contract limit and names the ask it carries', () => {
   expect(HITS.length).toBe(5);
@@ -31,4 +31,11 @@ test('tally counts only trials whose warm-up repaid, and only a nonzero advance 
   expect(a).toEqual({ arm: 'a', n: 4, warm_ok: 3, hit_committed: 1, hit_proposed: 2, rate: 1 / 3 });
   expect(rows.find((r) => r.arm === 'b')!.rate).toBe(1);
   expect(Number.isNaN(tally([t('c', 'refused')])[0].rate)).toBe(true);
+});
+
+test('an offer is not finished in the stale view between inclusion and the yield opening', () => {
+  expect(offerFinished({ pending_offer: null, settled: 1 }, 2)).toBe(false); // second offer sent, first one's numbers still showing
+  expect(offerFinished({ pending_offer: 7, settled: 1 }, 2)).toBe(false);
+  expect(offerFinished({ pending_offer: null, settled: 2 }, 2)).toBe(true);
+  expect(offerFinished(null, 1)).toBe(false);
 });

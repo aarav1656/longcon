@@ -59,3 +59,11 @@ export function tally(trials: Trial[]): ArmRow[] {
     };
   });
 }
+
+/**
+ * A traveler's offer is finished when nothing is pending and the settled count has reached the number of offers it has sent.
+ * Checking only "nothing pending" reads the moment after the transaction is included and before the contract has opened the yield.
+ */
+export function offerFinished(pv: { pending_offer: unknown; settled: number } | null, sent: number): boolean {
+  return !!pv && pv.pending_offer === null && pv.settled >= sent;
+}

@@ -68,8 +68,76 @@ Source: [Reddit comment](https://www.reddit.com/r/aigamedev/comments/1v2enqh/mad
 
 Why adjacent and adversarial: this is a direct test of whether the loop has a reason to return, but it is not a positive request for Long Con.
 
+## Added 2026-11-01: exact pain fit
+
+### Steam reviewer, repetition after the first hours
+
+Source: [Steam review](https://steamcommunity.com/profiles/76561199547283826/recommended/4954910/) of Scam With Your Friends. Date: 2026-10-30, from the review page. Person: a Steam reviewer with 6.3 hours played, outside the team, judges, and rival builders.
+
+> it gives you 3 hours of fun then it becomes way too repetitive
+
+Why it fits: exact pain for the AI con loop that Long Con extends with delayed, cross-town consequence. Verified by fetching the review page and finding the string in its HTML.
+
+### Steam reviewer, no interplay between sessions
+
+Source: [Steam review](https://steamcommunity.com/profiles/76561199205097240/recommended/4954910/). Date: 2026-10-15, from the review page. Person: a Steam reviewer with 1.3 hours played, outside the team, judges, and rival builders.
+
+> After about the 20 minute mark it gets very repetitive and boring. There is no real interplay with your fellow players. It is mostly an independent game.
+
+Why it fits: exact pain for a con game where one player's landed con changes what every other player meets next.
+
+### Aece-Kirigas, consequences under constraints
+
+Source: [Reddit post](https://www.reddit.com/r/gamedev/comments/1sfa588/i_think_most_ai_npc_projects_are_solving_the/) in r/gamedev. Date: 2026-04-07, from the Reddit search feed. Person: Aece-Kirigas, a game developer building LoreWeaver, outside the team, judges, and rival builders.
+
+> The real problem is structured decision-making and narrative consequences under constraints.
+
+Why it fits: exact pain. The model proposes, a constrained system decides, and the outcome has lasting consequence. It is the contract-clamp design stated by a builder who has not seen Long Con. Page text was read through a scraper because Reddit returns 403 to direct requests.
+
+## Added 2026-11-01: adjacent pain
+
+### Aece-Kirigas, per-hour cost of cloud NPCs
+
+Source: [Reddit post](https://www.reddit.com/r/aigamedev/comments/1sefk2y/i_ran_the_numbers_on_cloud_ai_npcs_using/) in r/aigamedev. Date: 2026-04-06. Person: Aece-Kirigas, same account as above.
+
+> With cloud AI NPCs, there's a point where you're hoping your best players get bored and leave, because every additional hour they play costs you money.
+
+Why adjacent: states the cost pressure that makes a bounded per-merchant batch the workable shape, but does not ask for a ledger.
+
+### Daniele-Fantastico, talk-the-NPC game loop
+
+Source: [Reddit post](https://www.reddit.com/r/LocalLLaMA/comments/1sucmt5/which_local_models_are_actually_good_at_staying/) in r/LocalLLaMA. Date: 2026-04-24. Person: Daniele-Fantastico, an indie developer shipping an offline game.
+
+> I'm building a small text-based game where the gameplay loop is "talk an NPC into revealing a secret." It's basically a 20+ turn roleplay stress test
+
+Why adjacent: another builder treating talk-the-NPC as the core loop. It shows the loop is wanted, not that persistent consequence is.
+
+### Virtualeaf, appetite for NPCs that matter
+
+Source: [Reddit post](https://www.reddit.com/r/gamedev/comments/1qbneeg/what_are_the_best_games_with_ai_npcs_that_you_can/) in r/gamedev. Date: 2026-01-13. Person: Virtualeaf, a prototyper of voice NPCs.
+
+> we expected our favourite games with NPCs we could talk to and with storylines that felt alive. But we just got a bunch of AI slop.
+
+Why adjacent: demand for AI NPCs with weight. No chain or contract request.
+
+### ekcheungAI, loss of control once NPCs have goals
+
+Source: [X post](https://x.com/ekcheungAI/status/2115005801970520257). Date: 2026-10-27. Person: ekcheungAI, 8,916 followers, account joined 2018-11-26 (fxTwitter).
+
+> once NPCs have goals, devs lose control of the story.
+
+Why adjacent: names the control problem that contract-side caps answer. Not a request for a ledger.
+
+### Web3Convict, full post on pay-per-message AI games
+
+Source: [X post](https://x.com/Web3Convict/status/2050768099960590751), read in full on 2026-11-01. The earlier entry above quotes one line of it.
+
+> you get 3 free tries to "hack" their AI. after that, you pay real SOL for every message.
+
+Why adjacent: the same author asks for inspectable rules and objects to paying a lottery with invisible rules. A free game with public caps is the alternative he describes.
+
 ## Sources searched
 
-Exa, Parallel web search and fetch, RivalSearch social search across Reddit, Hacker News and Product Hunt, and `papers search` on LLM NPC memory and agent safety. The two Reddit comments were fetched from the public PullPush comment endpoint and their source URLs opened separately. Paper evidence lives in `docs/PRIOR-ART.md` and is not counted as a person quote.
+Exa, Parallel web search and fetch, RivalSearch social search across Reddit, Hacker News and Product Hunt, `papers search` on LLM NPC memory and agent safety, and on 2026-11-01 Parallel search and fetch, treg X and Reddit search, Steam review pages and fxTwitter. The two Reddit comments were fetched from the public PullPush comment endpoint and their source URLs opened separately. Paper evidence lives in `docs/PRIOR-ART.md` and is not counted as a person quote.
 
 Conclusion: 3 exact-pain people found, 3 adjacent people found. No evidence found that any named person wants a chain, NEAR, tokens, or a contract ledger.

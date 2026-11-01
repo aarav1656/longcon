@@ -16,7 +16,7 @@ Needs only `python3` and a browser.
 
 1. Serve the ledger page: `python3 -m http.server 8080 --directory web`.
 2. Open http://127.0.0.1:8080/.
-   See the line `Contract longcon2-game.testnet on testnet ... Read at block <height>`, three merchants (Marta, Pell, Osk) with treasuries, grain and open loans read from the contract, and a Con records panel listing every landed con with its class, town, principal, bond burned and the request, response and configuration hashes.
+   See the line `Contract longcon2-game.testnet on testnet ... Read at block <height>`, three merchants (Marta, Pell, Osk) with treasuries, grain and open loans read from the contract, a Who signs the answers panel with the ed25519 key the contract trusts, and a Con records panel listing every landed con with its class, town, principal, bond burned and the request, response and configuration hashes.
 
 ## Try it
 
@@ -48,6 +48,7 @@ The reference road is deployed at `longcon2-game.testnet` and carries landed con
 | Panel | Endpoint | What it shows |
 |---|---|---|
 | Merchants and treasuries | `call_function` `state` on the contract, `finality: final` | Each merchant's gold, grain, buy and sell prices, open advances, gold lost to cons, the daily loss cap and the treasury cap |
+| Who signs the answers | `call_function` `state`, field `signers` | Each model name with the ed25519 key the contract verifies its answers against, and the road's model marked |
 | Con records | `call_function` `con_records` with `from: 0, limit: 50` | Every landed con: class, town, day, principal, bond burned, and the request, response and configuration hashes that bind it to a signed answer |
 | Read stamp | `block` with `finality: final` | The block height and time of the read, printed under each panel |
 
@@ -70,7 +71,7 @@ Players hold a browser key as a NEAR implicit account. A relayer pays gas throug
 ## Evidence
 
 - `docs/TESTS.md`: every method that moves or gates value, its sandbox test, and the mutation check (guard broken, test red, guard restored, test green) with command output.
-- `docs/SPIKE.md`: numbers measured on testnet against the live model endpoint: turn latency, batch behaviour, signature tamper rejection, red-team landing rates for two model strengths, gas.
+- `docs/SPIKE.md`: numbers measured on testnet against the live model endpoint: turn latency, batch behaviour, signature tamper rejection, red-team landing counts for six pitch structures, the long-con run with the contract's gold audit read at a stated block.
 - `tests/tests/sybil.rs`: 1,000 fresh accounts against one merchant cost it at most the daily cap.
 
 ## Prior art

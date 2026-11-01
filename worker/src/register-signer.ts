@@ -1,11 +1,14 @@
 import { account, env } from './chain.ts';
-import { attestedSigners, publicKeyHex } from './lib.ts';
+import { verifiedSigners } from './attest-check.ts';
+import { publicKeyHex } from './lib.ts';
 
 /**
  * Tell the contract which ed25519 key to trust for the configured model.
- *  - SIGN_MODE=near-ai: read the signing keys out of the NEAR AI Cloud attestation report
- *    (the model TEE key for provider signatures, the gateway TEE key for gateway signatures).
- *  - SIGN_MODE=worker: register the public half of WORKER_SIGNING_SEED for the model name.
+ *  - SIGN_MODE=near-ai: read the signing keys out of the NEAR AI Cloud attestation report, after the
+ *    Intel TDX quote of the gateway and of every model candidate has verified and bound the key and
+ *    the nonce sent below (the model TEE key for provider signatures, the gateway TEE key for gateway signatures).
+ *  - SIGN_MODE=worker: register the public half of WORKER_SIGNING_SEED as `worker:<model>`, the label of an operator key.
+ * Either way the worker account is registered as a relayer: only the owner and registered relayers deliver answers.
  */
 const contractId = env('CONTRACT_ID');
 const owner = account('OWNER_ACCOUNT_ID', 'OWNER_PRIVATE_KEY');
@@ -20,7 +23,7 @@ async function setSigner(name: string, keyHex: string) {
 }
 
 if (mode === 'worker') {
-  await setSigner(model, publicKeyHex(env('WORKER_SIGNING_SEED')));
+  await setSigner(`worker:${model}`, publicKeyHex(env('WORKER_SIGNING_SEED')));
 } else {
   const nonce = crypto.getRandomValues(new Uint8Array(32));
   const hex = Array.from(nonce, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -28,9 +31,12 @@ if (mode === 'worker') {
     headers: { accept: 'application/json', 'x-no-aliasing': 'true', authorization: `Bearer ${env('LLM_API_KEY')}` },
   });
   if (!r.ok) throw new Error(`attestation report ${r.status}: ${(await r.text()).slice(0, 160)}`);
-  const signers = attestedSigners(await r.json());
+  const accepted = env('ATTEST_TCB_STATUSES', 'UpToDate').split(',').map((s) => s.trim());
+  const signers = await verifiedSigners(await r.json(), hex, accepted);
   await setSigner(model, signers.model);
   if (signers.gateway) await setSigner('gateway', signers.gateway);
 }
+await owner.callFunction({ contractId, methodName: 'set_relayer', args: { account_id: env('WORKER_ACCOUNT_ID'), allowed: true }, gas: 30_000_000_000_000n, deposit: 0n });
+console.log(JSON.stringify({ ev: 'relayer_set', account: env('WORKER_ACCOUNT_ID') }));
 await owner.callFunction({ contractId, methodName: 'set_model', args: { model }, gas: 30_000_000_000_000n, deposit: 0n });
 console.log(JSON.stringify({ ev: 'model_set', model, contract: contractId }));

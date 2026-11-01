@@ -45,3 +45,20 @@ for (const [name, over, msg] of [
 test('rejects bytes that are not a delegate', () => {
   expect(() => vet(new Uint8Array([1, 2, 3]), CONTRACT)).toThrow('not a signed delegate');
 });
+
+import { callFor, joinBudget } from '../src/delegate.ts';
+
+test('a join delegate becomes a sponsored join for the account that signed it and nothing else does', async () => {
+  const join = await make({ method: 'join' });
+  expect(callFor(vet(join.bytes, CONTRACT))).toEqual({ kind: 'sponsor_join', args: { account_id: join.implicit } });
+  const offer = await make({ method: 'offer' });
+  expect(callFor(vet(offer.bytes, CONTRACT))).toEqual({ kind: 'delegate' });
+});
+
+test('the join budget stops at its maximum and frees a slot when the window passes', () => {
+  const may = joinBudget(2, 1000);
+  expect([may(0), may(10), may(20)]).toEqual([true, true, false]);
+  expect(may(1005)).toBe(true);
+  expect(may(1015)).toBe(true);
+  expect(may(1016)).toBe(false);
+});

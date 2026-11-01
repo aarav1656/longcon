@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/kamalbuilds/near-longcon/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kamalbuilds/near-longcon/actions/workflows/ci.yml)
 
-A free browser game on a NEAR contract. Three AI merchants on a road of three towns lend gold that is real contract state. You pitch a merchant a story and ask for an advance. The merchant's model proposes terms, the contract proves which model answered, and the contract clamps the terms to limits no pitch can move. Repay and your credit line grows. Default and your bond burns, the merchant books the loss, and the contract writes a con record that the next town reads one game day later.
+A free browser game on a NEAR contract. Three AI merchants on a road of three towns lend gold that is real contract state. You pitch a merchant a story and ask for an advance. The merchant's model proposes terms, the contract accepts an answer only when its ed25519 signature verifies against the key registered for the road's model, and the contract clamps the terms to limits no pitch can move. Repay and your credit line grows. Default and your bond burns, the merchant books the loss, and the contract writes a con record that the next town reads one game day later.
 
 Built at NEAR HACKATHON. Tracks: games, security.
 
@@ -23,7 +23,7 @@ Needs only `python3` and a browser.
 Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `wasm-opt` (binaryen 123), `bun` 1.4, `jq`, `python3`.
 
 1. Run the contract suite from a clean clone: `cargo test --workspace`.
-   See `test result: ok` for the unit tests and for each sandbox binary (attestation, batch, clamps, guards, lifecycle, rumours, sybil). The sandbox runs the real wasm through real receipts.
+   See `test result: ok` for the unit tests and for each sandbox binary (attestation, batch, clamps, guards, hardening, lifecycle, rumours, sybil). The sandbox runs the real wasm through real receipts.
 2. Run the client tests: `(cd worker && bun install && bun test ./test) && (cd web && bun install && bun test ./test)`.
    See `0 fail` twice.
 3. Build the contract wasm the tests and the deploy script use: `scripts/build-wasm.sh`.
@@ -31,8 +31,8 @@ Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `w
 4. Give the merchants a model: `cp .env.example .env`, then place your own endpoint and key in `.env` (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `SIGN_MODE`). NEAR AI Cloud with `SIGN_MODE=near-ai` is the default shape.
 5. Deploy your own road to testnet: `PREFIX=mygame LLM_MODEL=<your model id> scripts/testnet-up.sh`.
    See four faucet funded accounts (`mygame-game.testnet` is the contract) and `The "new" call ... succeeded`.
-6. Register the key the contract trusts for that model: `PREFIX=mygame scripts/register-signer.sh`.
-   See `signer_set` and `model_set` lines.
+6. Register the key the contract trusts for that model and the worker as a relayer: `PREFIX=mygame scripts/register-signer.sh`. With `SIGN_MODE=near-ai` the key comes from the NEAR AI Cloud attestation report only after the Intel TDX quote of the gateway and of every model candidate verifies and binds the key and the nonce the script sent.
+   See `signer_set`, `relayer_set` and `model_set` lines.
 7. Play: `PREFIX=mygame scripts/play.sh`, then open http://127.0.0.1:5173/game.html.
    Pick Marta, press a pitch starter, press Pitch. See the verdict panel show what the merchant offered, what the road allowed, and which cap cut it. Press End day twice after taking an advance and see the debt default, your bond burn and a record appear in the con ledger. Pitch the next town and see its merchant carry the news.
 
@@ -48,7 +48,7 @@ The reference road is deployed at `longcon2-game.testnet` and carries landed con
 | Panel | Endpoint | What it shows |
 |---|---|---|
 | Merchants and treasuries | `call_function` `state` on the contract, `finality: final` | Each merchant's gold, grain, buy and sell prices, open advances, gold lost to cons, the daily loss cap and the treasury cap |
-| Who signs the answers | `call_function` `state`, field `signers` | Each model name with the ed25519 key the contract verifies its answers against, and the road's model marked |
+| Who signs the answers | `call_function` `state`, field `signers` | Each signer name with the ed25519 key the contract verifies its answers against, and the road's model marked |
 | Con records | `call_function` `con_records` with `from: 0, limit: 50` | Every landed con: class, town, day, principal, bond burned, and the request, response and configuration hashes that bind it to a signed answer |
 | Read stamp | `block` with `finality: final` | The block height and time of the read, printed under each panel |
 
@@ -60,13 +60,13 @@ Open it with `python3 -m http.server 8080 --directory web` and browse to `/`, or
 |---|---|---|
 | Offer | `offer()` | The player's bond is escrowed and the call opens a NEAR yield (`promise_yield_create_with_id`, id = sha256(player, nonce)). A timeout refunds the bond. |
 | Batch | `seal_batch()` | Offers waiting at one merchant are frozen into a single request that the contract builds itself. Sealing opens after a 6 block window, so no caller can put one traveler alone in front of the merchant. The model weighs every pitch before any is decided. |
-| Answer | `npc_resume_batch()` | The worker POSTs the contract's exact bytes to the model endpoint, gets an ed25519 signature over `model:sha256(request):sha256(response)`, and relays it. `env::ed25519_verify` accepts the answer only for the request the contract built. One altered byte is rejected and the yield stays open. |
+| Answer | `npc_resume_batch()` | The worker POSTs the contract's exact bytes to the model endpoint, gets an ed25519 signature over `model:sha256(request):sha256(response)`, and relays it. `env::ed25519_verify` accepts the answer only for the request the contract built. The request carries the batch id and the block's random seed, so a signed answer fits exactly one batch, and only the owner and registered relayers deliver answers, so a player cannot choose among several signed samples. One altered byte is rejected and the yield stays open. |
 | Clamp | `on_terms()` | Advance is cut to bond plus earned line, 15 gold per merchant per due day, 30 percent of the merchant's capital, and the traveler's ask. Interest is held between 0 and 50 percent. Quotes keep every buy price below every sell price, so no grain round trip makes gold. |
-| Default | `advance_day()` | An unpaid debt defaults: the bond burns, the merchant books the loss, and a structured con record (class, town, day, amount, request and response hashes, merchant configuration hash) is written. Records hold no free text. |
+| Default | `advance_day()` | An unpaid debt defaults: the bond burns, the credit line it was lent against is taken back, the merchant books the loss, and a structured con record (class, town, day, amount, request and response hashes, merchant configuration hash) is written. Records hold no free text. |
 | Caravan | `news_at()` | A record reaches a town one game day per town of distance, enters that merchant's prompt, and expires after 8 days. |
 | Rumour | `mt_transfer()` | Each landed con mints a NEP-245 rumour token to the con artist. The first landing of a class takes its place on the Wanted board. |
 
-Players hold a browser key as a NEAR implicit account. A relayer pays gas through NEP-366 delegate actions, so there is no wallet popup.
+Players hold a browser key as a NEAR implicit account. A relayer pays gas through NEP-366 delegate actions and fronts the 0.2 NEAR storage stake each join carries (`sponsor_join`), so there is no wallet popup. Each account has an allowance of 24 offers and a settled offer drops its pitch text, because its request hash already binds it, so contract storage is paid for by the stake.
 
 ## Evidence
 

@@ -81,6 +81,8 @@ impl World {
         let signer = SigningKey::generate(&mut rand::rngs::OsRng);
         let w = Self { worker, owner, contract, signer };
         w.owner_call("set_signer", json!({"name": MODEL, "key_hex": hex::encode(w.signer.verifying_key().to_bytes())})).await?.into_result()?;
+        // the account the harness plays the worker from
+        w.owner_call("set_relayer", json!({"account_id": w.worker.root_account()?.id(), "allowed": true})).await?.into_result()?;
         Ok(w)
     }
 
@@ -95,7 +97,7 @@ impl World {
     pub async fn player(&self, name: &str) -> Result<Account> {
         let root = self.worker.root_account()?;
         let acc = root.create_subaccount(name).initial_balance(NearToken::from_near(2)).transact().await?.into_result()?;
-        acc.call(self.contract.id(), "join").max_gas().transact().await?.into_result()?;
+        acc.call(self.contract.id(), "join").deposit(join_deposit()).max_gas().transact().await?.into_result()?;
         Ok(acc)
     }
 
@@ -108,10 +110,10 @@ impl World {
             let mut accs = vec![];
             for i in chunk {
                 // one signer, so creation is sequential; the joins below are parallel because each account signs its own
-                accs.push(root.create_subaccount(&format!("{prefix}{i}")).initial_balance(NearToken::from_millinear(300)).transact().await?.into_result()?);
+                accs.push(root.create_subaccount(&format!("{prefix}{i}")).initial_balance(NearToken::from_millinear(500)).transact().await?.into_result()?);
             }
             let id = self.contract.id().clone();
-            let joined = join_all(accs.iter().map(|a| a.call(&id, "join").gas(near_workspaces::types::Gas::from_tgas(30)).transact())).await;
+            let joined = join_all(accs.iter().map(|a| a.call(&id, "join").deposit(join_deposit()).gas(near_workspaces::types::Gas::from_tgas(30)).transact())).await;
             for j in joined {
                 j?.into_result()?;
             }
@@ -244,6 +246,11 @@ pub struct OpenOffer {
 }
 
 pub const BATCH_WINDOW_BLOCKS: u64 = 6;
+
+/// The storage deposit a join must carry.
+pub fn join_deposit() -> NearToken {
+    NearToken::from_millinear(200)
+}
 
 /// A batch answer from per-slot decision objects (as produced by `terms`). The merchant's grain
 /// prices, when a decision carries them, move to the top level where the prompt asks for them.

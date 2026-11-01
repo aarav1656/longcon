@@ -1,5 +1,5 @@
 import { account, env, provider, view } from './chain.ts';
-import { toAction, vet } from './delegate.ts';
+import { callFor, joinBudget, toAction, vet } from './delegate.ts';
 import { sleep } from './lib.ts';
 import { parseNearAmount } from 'near-api-js';
 
@@ -10,6 +10,9 @@ const ACTIVATION = BigInt(process.env.ACTIVATION_YOCTO ?? '300000000000000000000
 const PORT = Number(process.env.RELAYER_PORT ?? 8787);
 const ORIGIN = process.env.RELAYER_ORIGIN ?? '*';
 const PER_MINUTE = Number(process.env.RELAYER_PER_MINUTE ?? 30);
+
+const JOIN_DEPOSIT = BigInt(process.env.JOIN_DEPOSIT_YOCTO ?? '200000000000000000000000'); // 0.2 NEAR, the storage stake the contract requires on join
+const mayJoin = joinBudget(Number(process.env.RELAYER_JOINS_PER_DAY ?? 50));
 
 const hits = new Map<string, number[]>();
 function limited(who: string): boolean {
@@ -79,6 +82,13 @@ Bun.serve({
       if (url.pathname === '/relay' && req.method === 'POST') {
         const { signed_delegate } = (await req.json()) as { signed_delegate: string };
         const checked = vet(Buffer.from(signed_delegate, 'base64'), contractId);
+        const call = callFor(checked);
+        if (call.kind === 'sponsor_join') {
+          if (!mayJoin()) return json({ error: 'the road has taken its travelers for today, try again tomorrow' }, 429);
+          const res: any = await relayer.callFunction({ contractId, methodName: 'sponsor_join', args: call.args, gas: 30_000_000_000_000n, deposit: JOIN_DEPOSIT });
+          const tx = res?.transaction?.hash ?? res?.transaction_outcome?.id ?? res?.transactionOutcome?.id;
+          return json({ ok: true, method: 'join', tx });
+        }
         const res: any = await relayer.signAndSendTransaction({
           receiverId: checked.senderId,
           actions: [toAction(checked.signed)],

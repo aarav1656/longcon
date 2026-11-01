@@ -6,7 +6,7 @@ use serde_json::json;
 async fn joining_twice_does_not_mint_a_second_stipend() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let a = w.player("alice").await?;
-    let again = failure_text(a.call(w.contract.id(), "join").max_gas().transact().await).expect("second join");
+    let again = failure_text(a.call(w.contract.id(), "join").deposit(join_deposit()).max_gas().transact().await).expect("second join");
     assert!(again.contains("already joined"), "{again}");
     assert_eq!(w.player_view(a.id()).await?["gold"], json!(20));
     assert_eq!(w.audit().await?["minted_gold"], json!(300 + 20));

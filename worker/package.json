@@ -11,6 +11,7 @@
     "spike": "bun run src/spike.ts"
   },
   "dependencies": {
+    "@phala/dcap-qvl": "^0.7.0",
     "near-api-js": "^7.4.0"
   },
   "devDependencies": {

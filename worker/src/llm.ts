@@ -80,8 +80,8 @@ export async function answer(cfg: LlmCfg, requestBody: string, slots: number, de
     const t1 = Date.now();
     if (cfg.signMode === 'worker') {
       if (!cfg.seed) throw new Error('worker signing needs WORKER_SIGNING_SEED');
-      const signature = signWithSeed(cfg.seed, signedText('provider_tee', cfg.model, reqHash, respHash));
-      return { response: text, signature, kind: 'provider_tee', chatId: JSON.parse(text).id ?? '', llmMs, sigMs: Date.now() - t1, attempts };
+      const signature = signWithSeed(cfg.seed, signedText('worker', cfg.model, reqHash, respHash));
+      return { response: text, signature, kind: 'worker', chatId: JSON.parse(text).id ?? '', llmMs, sigMs: Date.now() - t1, attempts };
     }
     const chatId = String(JSON.parse(text).id ?? '');
     const s = await nearAiSignature(cfg, chatId, (k) => signedText(k, cfg.model, reqHash, respHash), deadline);

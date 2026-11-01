@@ -14,6 +14,12 @@ pub const TREASURY_CAP_PCT: u64 = 30;
 pub const MAX_DUE_DAYS: u32 = 5;
 pub const MAX_INTEREST_PCT: u64 = 50;
 pub const MAX_OFFERS_PER_DAY: u32 = 6;
+/// An account's lifetime offers. A settled offer keeps its hashes and outcome in state, so this
+/// bounds what one join deposit has to pay for.
+pub const MAX_OFFERS_PER_ACCOUNT: u32 = 24;
+/// Storage stake attached to a join: 20 KB at 0.00001 NEAR per byte, enough for the player row and
+/// every offer the allowance above permits.
+pub const JOIN_DEPOSIT_YOCTO: u128 = 200_000_000_000_000_000_000_000;
 pub const TRADE_LINE_DIV: u64 = 10;
 pub const REPAY_LINE_DIV: u64 = 2;
 pub const ON_TERMS_TGAS: u64 = 30;

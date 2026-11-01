@@ -11,7 +11,7 @@ pub fn sha256_hex(s: &str) -> String {
 
 pub fn signed_text(kind: SigKind, model: &str, req_hash: &str, resp_hash: &str) -> String {
     match kind {
-        SigKind::ProviderTee => format!("{model}:{req_hash}:{resp_hash}"),
+        SigKind::ProviderTee | SigKind::Worker => format!("{model}:{req_hash}:{resp_hash}"),
         SigKind::Gateway => format!("{req_hash}:{resp_hash}"),
     }
 }
@@ -196,5 +196,6 @@ mod tests {
     fn signed_text_shapes() {
         assert_eq!(signed_text(SigKind::ProviderTee, "m", "a", "b"), "m:a:b");
         assert_eq!(signed_text(SigKind::Gateway, "m", "a", "b"), "a:b");
+        assert_eq!(signed_text(SigKind::Worker, "m", "a", "b"), "m:a:b");
     }
 }

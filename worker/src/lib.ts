@@ -1,12 +1,12 @@
 import { createHash, createPrivateKey, sign as edSign } from 'node:crypto';
 
-export type SigKind = 'provider_tee' | 'gateway';
+export type SigKind = 'provider_tee' | 'gateway' | 'worker';
 
 export const sha256Hex = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 
 /** The exact text the signer signs, mirroring contract/src/attest.rs signed_text. */
 export function signedText(kind: SigKind, model: string, reqHash: string, respHash: string): string {
-  return kind === 'provider_tee' ? `${model}:${reqHash}:${respHash}` : `${reqHash}:${respHash}`;
+  return kind === 'gateway' ? `${reqHash}:${respHash}` : `${model}:${reqHash}:${respHash}`;
 }
 
 const PKCS8_ED25519_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex');

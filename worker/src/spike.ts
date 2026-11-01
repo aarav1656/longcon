@@ -21,6 +21,7 @@ const MERCHANT = Number(process.env.SPIKE_MERCHANT ?? 1); // a merchant with tre
 const OUT = process.env.SPIKE_OUT ?? 'spike-results.jsonl';
 const FUND = BigInt(process.env.SPIKE_FUND_YOCTO ?? '120000000000000000000000'); // 0.12 NEAR per traveler covers the 100 Tgas reservation at testnet gas prices
 const LONG_FUND = FUND * 3n; // join, up to two warm-up offers, one hit and a repay each reserve gas up front
+const JOIN_DEPOSIT = BigInt(process.env.JOIN_DEPOSIT_YOCTO ?? '200000000000000000000000');
 const OFFER_GAS = BigInt(process.env.SPIKE_OFFER_TGAS ?? '100') * 1_000_000_000_000n;
 
 const out = (o: object) => {
@@ -36,7 +37,7 @@ async function newTraveler(fund: bigint = FUND): Promise<Traveler> {
   const id = Buffer.from(kp.getPublicKey().data).toString('hex');
   await owner.transfer({ receiverId: id, amount: fund });
   const acc = new Account(id, p, new KeyPairSigner(kp));
-  await acc.callFunction({ contractId, methodName: 'join', args: {}, gas: 30_000_000_000_000n, deposit: 0n });
+  await owner.callFunction({ contractId, methodName: 'sponsor_join', args: { account_id: id }, gas: 30_000_000_000_000n, deposit: JOIN_DEPOSIT }); // the owner fronts the storage stake, as the relayer does for a browser player
   await sleep(4000); // the unused gas of the join comes back to the traveler one block later; the offer reserves 100 Tgas
   return { id, acc };
 }
@@ -69,8 +70,9 @@ async function setModel(model: string) {
   // near-ai: the signer is the key from the provider's attestation report, put there by register-signer; only worker mode registers the worker's own key
   if (SIGN_MODE === 'worker') {
     const seed = env('WORKER_SIGNING_SEED');
-    await owner.callFunction({ contractId, methodName: 'set_signer', args: { name: model, key_hex: publicKeyHex(seed) }, gas: 30_000_000_000_000n, deposit: 0n });
+    await owner.callFunction({ contractId, methodName: 'set_signer', args: { name: `worker:${model}`, key_hex: publicKeyHex(seed) }, gas: 30_000_000_000_000n, deposit: 0n });
   }
+  await owner.callFunction({ contractId, methodName: 'set_relayer', args: { account_id: env('WORKER_ACCOUNT_ID'), allowed: true }, gas: 30_000_000_000_000n, deposit: 0n });
   await owner.callFunction({ contractId, methodName: 'set_model', args: { model }, gas: 30_000_000_000_000n, deposit: 0n });
 }
 

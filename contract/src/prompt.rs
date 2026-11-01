@@ -25,6 +25,10 @@ pub struct Traveler<'a> {
 
 pub struct Ctx<'a> {
     pub model: &'a str,
+    /// Batch number and the block's random seed: they make every sealed request unique, so a signed
+    /// answer cannot be held back and replayed on a later batch with the same game state.
+    pub batch_id: u64,
+    pub nonce: &'a str,
     pub day: u32,
     pub merchant: &'a Merchant,
     pub news: &'a [News],
@@ -46,9 +50,9 @@ pub fn build(c: &Ctx) -> String {
     let seed = &SEEDS[m.id as usize];
     let town = TOWNS[m.town as usize];
     let mut user = format!(
-        "You are {}, {}. You trade at {} (town {} of 3). Today is day {}.\n\
+        "You are {}, {}. You trade at {} (town {} of 3). Today is day {}. Ledger batch {}, seal {}.\n\
          Your treasury: {} gold, {} grain. Open advances: {} gold. Your grain prices: you buy at {}, you sell at {}.\n",
-        m.name, seed.persona, town, m.town + 1, c.day, m.gold, m.grain, m.outstanding, m.buy_price, m.sell_price
+        m.name, seed.persona, town, m.town + 1, c.day, c.batch_id, c.nonce, m.gold, m.grain, m.outstanding, m.buy_price, m.sell_price
     );
     if c.news.is_empty() {
         user.push_str("News that has reached your town: none.\n");

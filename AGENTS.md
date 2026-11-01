@@ -19,7 +19,7 @@ Long Con: a NEAR contract game. Three AI merchants lend gold held as contract st
 ## Run
 - Env names are in `.env.example`: `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `SIGN_MODE` (`near-ai` or `worker`), `WORKER_SIGNING_SEED`. Never commit values.
 - Network: NEAR testnet. RPC `https://test.rpc.fastnear.com`. Reference contract `longcon-game.testnet`; evidence run on `longcon2-game.testnet`.
-- Deploy a road: `PREFIX=mygame LLM_MODEL=<model> scripts/testnet-up.sh`, then `PREFIX=mygame scripts/register-signer.sh`, then `PREFIX=mygame scripts/play.sh`.
+- Deploy a road: `PREFIX=mygame LLM_MODEL=<model> scripts/testnet-up.sh`, then `PREFIX=mygame scripts/register-signer.sh` (registers the signer key and the worker as a relayer; only the owner and registered relayers can deliver an answer), then `PREFIX=mygame scripts/play.sh`.
 - Ledger page: `python3 -m http.server 8080 --directory web`, open `/?contract=<id>`.
 - Measurements: `cd worker && bun run spike latency|batch|negative|redteam|longcon`.
 

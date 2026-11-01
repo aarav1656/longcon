@@ -62,6 +62,9 @@ pub enum SigKind {
     ProviderTee,
     /// Signed by the gateway TEE: text is `sha256(req):sha256(resp)`.
     Gateway,
+    /// Signed by the operator's own worker key: same text as the model TEE, registered and reported
+    /// as `worker:<model>` so an operator signature is never labelled as the model's.
+    Worker,
 }
 
 #[near(serializers = [json, borsh])]

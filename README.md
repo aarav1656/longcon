@@ -10,6 +10,14 @@ Built at NEAR HACKATHON. Tracks: games, security.
 
 Games that let you talk an AI out of a prize keep their rules on a private server. A player cannot tell whether the model refused or the house did, and a trick that works once works forever, so the fun ends in about two hours. Long Con moves the rules into a contract: the model proposes, the contract decides, and every landed con becomes news that makes the next merchant harder to fool.
 
+## See it live in one minute
+
+Needs only `python3` and a browser.
+
+1. Serve the ledger page: `python3 -m http.server 8080 --directory web`.
+2. Open http://127.0.0.1:8080/.
+   See the line `Contract longcon2-game.testnet on testnet ... Read at block <height>`, three merchants (Marta, Pell, Osk) with treasuries, grain and open loans read from the contract, and a Con records panel listing every landed con with its class, town, principal, bond burned and the request, response and configuration hashes.
+
 ## Try it
 
 Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `wasm-opt` (binaryen 123), `bun` 1.4, `jq`, `python3`.
@@ -28,10 +36,10 @@ Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `w
 7. Play: `PREFIX=mygame scripts/play.sh`, then open http://127.0.0.1:5173/game.html.
    Pick Marta, press a pitch starter, press Pitch. See the verdict panel show what the merchant offered, what the road allowed, and which cap cut it. Press End day twice after taking an advance and see the debt default, your bond burn and a record appear in the con ledger. Pitch the next town and see its merchant carry the news.
 
-8. Read the road without a build: `python3 -m http.server 8080 --directory web`, then open http://127.0.0.1:8080/?contract=mygame-game.testnet.
+8. Read your own road without a build: `python3 -m http.server 8080 --directory web`, then open http://127.0.0.1:8080/?contract=mygame-game.testnet.
    See three merchants with treasuries and open advances, each panel stamped with the block it was read at, and every con record once a debt has defaulted.
 
-A reference road is deployed at `longcon-game.testnet`. Read it with `near contract call-function as-read-only longcon-game.testnet state json-args {} network-config testnet now`.
+The reference road is deployed at `longcon2-game.testnet` and carries landed cons. Read it with `near contract call-function as-read-only longcon2-game.testnet state json-args {} network-config testnet now`.
 
 ## Ledger page
 
@@ -43,7 +51,7 @@ A reference road is deployed at `longcon-game.testnet`. Read it with `near contr
 | Con records | `call_function` `con_records` with `from: 0, limit: 50` | Every landed con: class, town, day, principal, bond burned, and the request, response and configuration hashes that bind it to a signed answer |
 | Read stamp | `block` with `finality: final` | The block height and time of the read, printed under each panel |
 
-Open it with `python3 -m http.server 8080 --directory web` and browse to `/`, or to `/?contract=<account id>` for any road. The default road comes from `web/public/config.json`. The playable client is `web/game.html`.
+Open it with `python3 -m http.server 8080 --directory web` and browse to `/`, or to `/?contract=<account id>` for any road, with `&rpc=<url>` and `&network=mainnet|testnet` to point it elsewhere. The default road, `longcon2-game.testnet`, comes from `web/public/config.json`. Each panel prints the block height and time it was read at. A road with no landed con shows how one lands and which road to open instead. The playable client is `web/game.html`; `(cd web && bun test ./test)` covers the page's rendering.
 
 ## How it works
 

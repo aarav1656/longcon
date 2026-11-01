@@ -287,6 +287,18 @@ async function tickUntil(done: (s: any) => boolean, max: number): Promise<number
   throw new Error(`condition not reached after ${max} day ticks`);
 }
 
+/** Tick game days until no debt is open and no merchant carries news, so a trial starts from the same quiet road every time. */
+async function settleRoad() {
+  const quiet = async () => {
+    const news = await Promise.all([0, 1, 2].map((m) => view(p, contractId, 'news_at', { merchant: m })));
+    return news.every((x: any) => x.length === 0) && (await stateView()).merchants.every((m: any) => m.outstanding === 0);
+  };
+  for (let n = 0; !(await quiet()); n++) {
+    if (n > 20) throw new Error('road never went quiet');
+    await tick();
+  }
+}
+
 async function longcon(rounds: number) {
   await setModel(env('LLM_MODEL'));
   const metrics = `spike-longcon-${Date.now()}.jsonl`;
@@ -294,6 +306,7 @@ async function longcon(rounds: number) {
   const trials: Trial[] = [];
   const towns = ['Marta', 'Pell', 'Osk'];
   try {
+    await settleRoad();
     for (let r = 0; r < rounds; r++) {
       for (const phase of ['no_news', 'news'] as const) {
         const known = await Promise.all([0, 1, 2].map(async (m) => ((await view(p, contractId, 'news_at', { merchant: m })) as any[]).length));
@@ -312,12 +325,7 @@ async function longcon(rounds: number) {
         const days = await tickUntil((s) => s.merchants.every((m: any) => m.outstanding === 0), 8);
         out({ ev: 'longcon_defaults', round: r + 1, phase, day_ticks: days, records: ((await view(p, contractId, 'con_records', { from: 0, limit: 200 })) as any[]).length });
       }
-      // let the news expire (NEWS_TTL_DAYS = 8) so the next round starts from a quiet road
-      let quiet = 0;
-      while ((await Promise.all([0, 1, 2].map((m) => view(p, contractId, 'news_at', { merchant: m })))).some((x: any) => x.length > 0)) {
-        if (quiet++ > 12) throw new Error('news never expired');
-        await tick();
-      }
+      await settleRoad(); // let the news expire (NEWS_TTL_DAYS = 8) so the next round starts from a quiet road
     }
   } finally {
     await stopWorker();

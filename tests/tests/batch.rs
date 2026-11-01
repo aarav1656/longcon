@@ -45,6 +45,55 @@ async fn a_full_batch_seals_without_waiting_and_the_rest_wait_for_the_next() -> 
 }
 
 #[tokio::test]
+async fn seal_logs_the_hashed_request_and_keeps_the_answer_signature() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let players = w.fresh_players("log", 8).await?;
+    for p in &players {
+        w.open_offer(p, 0, 2, 1, &"\"".repeat(400)).await?;
+    }
+    let sealed = w.seal_raw(0).await?.into_result()?;
+    let batch: u64 = sealed.json()?;
+    let prefix = format!("LONGCON_REQUEST:{batch}:");
+    let body = sealed.logs().iter().find_map(|log| log.strip_prefix(&prefix)).expect("request log");
+    let view = w.view("batch", json!({"batch_id": batch})).await?;
+    assert_eq!(sha256_hex(body), view["request_hash"]);
+
+    let response = r#"{"decisions":[{"slot":1,"verdict":"accept","advance":1,"repay":1,"due_days":1,"class":"other"}]}"#;
+    let (response, signature) = w.signed(body, response);
+    w.relay(batch, &response, &signature, "provider_tee").await?.into_result()?;
+    let resolved = w.view("batch", json!({"batch_id": batch})).await?;
+    assert_eq!(resolved["signature"], signature);
+    assert_eq!(resolved["response_hash"], sha256_hex(&response));
+    Ok(())
+}
+
+#[tokio::test]
+async fn one_storage_stake_covers_24_maximum_term_sheet_batches() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let root = w.worker.root_account()?;
+    let player = root.create_subaccount("staked").initial_balance(near_workspaces::types::NearToken::from_near(1)).transact().await?.into_result()?;
+    w.owner.call(w.contract.id(), "sponsor_join").args_json(json!({"account_id": player.id()})).deposit(join_deposit()).max_gas().transact().await?.into_result()?;
+    let before = w.contract.view_account().await?.storage_usage;
+    let reason = "é".repeat(79);
+    let content = format!(r#"{{"decisions":[{{"slot":1,"verdict":"accept","advance":18446744073709551615,"repay":18446744073709551615,"due_days":4294967295,"buy_price":18446744073709551615,"sell_price":18446744073709551615,"class":"borrowed_authority","reason":"{reason}"}}]}}"#);
+    for i in 0..24 {
+        if i > 0 && i % 6 == 0 { w.advance_day(&player).await?.into_result()?; }
+        let offer = w.open_offer(&player, (i % 3) as u8, 1, 1, "bounded pitch").await?;
+        let (batch, body) = w.body_of(&offer).await?;
+        let (response, signature) = w.signed(&body, &content);
+        w.relay(batch, &response, &signature, "provider_tee").await?.into_result()?;
+        let outcome = offer.status.await?.json::<Value>()?;
+        if let Some(debt_id) = outcome["debt_id"].as_u64() {
+            player.call(w.contract.id(), "repay_debt").args_json(json!({"debt_id": debt_id})).max_gas().transact().await?.into_result()?;
+        }
+    }
+    let used = w.contract.view_account().await?.storage_usage - before;
+    println!("sponsored join plus 24 maximum-term batches: {used} storage bytes");
+    assert!(used <= 20_000, "storage growth {used} bytes exceeds the 0.2 NEAR stake allowance");
+    Ok(())
+}
+
+#[tokio::test]
 async fn offers_in_one_batch_share_the_daily_cap_in_slot_order() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let a = w.player("alice").await?;
@@ -169,7 +218,7 @@ async fn pitch_text_never_reaches_another_merchant_only_class_town_day_and_amoun
             assert!(!body.contains(needle), "merchant {merchant} was shown player prose: {needle}");
         }
         w.answer(&o, &terms("refuse", 0, 0, 1, "other")).await?.into_result()?;
-        o.status.await?;
+        o.status.await?.into_result()?;
     }
     Ok(())
 }

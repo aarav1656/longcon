@@ -63,6 +63,19 @@ async fn six_offers_a_day_and_then_the_limit() -> Result<()> {
 }
 
 #[tokio::test]
+async fn offers_reject_control_characters_in_pitches() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let accounts = w.fresh_players("ctrl", 8).await?;
+    for account in accounts {
+        let err = failure_text(account.call(w.contract.id(), "offer")
+            .args_json(json!({"merchant": 0, "ask": 2, "bond": 1, "pitch": format!("{}\u{1}", "a".repeat(399))}))
+            .max_gas().transact().await).expect("control character rejected");
+        assert!(err.contains("pitch may not contain control characters"), "{err}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn funding_a_merchant_keeps_the_audit_identity() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     w.owner_call("fund_merchant", json!({"merchant": 1, "gold": 40, "grain": 10})).await?.into_result()?;

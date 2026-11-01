@@ -162,6 +162,8 @@ pub struct Batch {
     pub request_body: String,
     pub request_hash: String,
     pub config_hash: String,
+    pub signature: String,
+    pub response_hash: String,
 }
 
 #[near(serializers = [json, borsh])]

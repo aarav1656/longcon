@@ -71,7 +71,7 @@ async fn seal_logs_the_hashed_request_and_keeps_the_answer_signature() -> Result
 async fn one_storage_stake_covers_24_maximum_term_sheet_batches() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let root = w.worker.root_account()?;
-    let player = root.create_subaccount("staked").initial_balance(near_workspaces::types::NearToken::from_near(1)).transact().await?.into_result()?;
+    let player = root.create_subaccount("staked").initial_balance(near_workspaces::types::NearToken::from_near(2)).transact().await?.into_result()?;
     w.owner.call(w.contract.id(), "sponsor_join").args_json(json!({"account_id": player.id()})).deposit(join_deposit()).max_gas().transact().await?.into_result()?;
     let before = w.contract.view_account().await?.storage_usage;
     let reason = "é".repeat(79);

@@ -69,7 +69,7 @@ async fn offers_reject_control_characters_in_pitches() -> Result<()> {
     for account in accounts {
         let err = failure_text(account.call(w.contract.id(), "offer")
             .args_json(json!({"merchant": 0, "ask": 2, "bond": 1, "pitch": format!("{}\u{1}", "a".repeat(399))}))
-            .max_gas().transact().await).expect("control character rejected");
+            .gas(near_workspaces::types::Gas::from_tgas(30)).transact().await).expect("control character rejected");
         assert!(err.contains("pitch may not contain control characters"), "{err}");
     }
     Ok(())

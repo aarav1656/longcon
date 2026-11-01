@@ -13,12 +13,18 @@ export const RPC: Record<string, string> = {
 
 const rpcHosts = new Set([...Object.values(RPC), process.env.NEAR_RPC_URL ?? ''].filter(Boolean).map((u) => new URL(u).host));
 const realFetch = globalThis.fetch;
-/** The public RPCs answer a burst with 429 and near-api-js does not retry it, so a game turn would fail. Ask again after a pause. */
+/** The public RPCs answer a burst with 429, or with HTTP 200 and a JSON-RPC error code -429, and near-api-js retries neither, so a game turn would fail. Ask again after a pause. */
+const rateLimited = async (r: Response): Promise<boolean> => {
+  if (r.status === 429) return true;
+  if (!r.ok) return false;
+  const text = await r.clone().text();
+  return text.length < 400 && /"code"\s*:\s*-429/.test(text);
+};
 globalThis.fetch = (async (input: any, init?: any) => {
   const host = new URL(typeof input === 'string' ? input : (input.url ?? String(input))).host;
   for (let attempt = 0; ; attempt++) {
     const r = await realFetch(input, init);
-    if (r.status !== 429 || !rpcHosts.has(host) || attempt >= 30) return r;
+    if (!rpcHosts.has(host) || attempt >= 30 || !(await rateLimited(r))) return r;
     await new Promise((res) => setTimeout(res, Math.min(800 * (attempt + 1), 5000)));
   }
 }) as typeof fetch;

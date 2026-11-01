@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs
 import { actions as A, KeyPair, KeyPairSigner, Account } from 'near-api-js';
 import { account, env, provider, view } from './chain.ts';
 import { percentile, publicKeyHex, sleep } from './lib.ts';
+import { HITS, WARM, WARM_RETRY, hitAsk, tally, type Trial } from './arms.ts';
 
 /**
  * Measurements against the real contract on testnet and the real model endpoint in .env.
@@ -9,6 +10,7 @@ import { percentile, publicKeyHex, sleep } from './lib.ts';
  *   bun run spike batch                three travelers into one merchant at once: one batch, one model call
  *   bun run spike negative             a valid answer with one byte changed must be rejected on chain
  *   bun run spike redteam <modelA,modelB> [reps]   con pitches and honest pitches per model per merchant
+ *   bun run spike longcon [rounds]     repay once, then ask for more and default: does a long con land, and does the news change the next merchant's answer
  * Results are appended to spike-results.jsonl (gitignored).
  */
 const contractId = env('CONTRACT_ID');
@@ -18,6 +20,7 @@ const worker = account('WORKER_ACCOUNT_ID', 'WORKER_PRIVATE_KEY');
 const MERCHANT = Number(process.env.SPIKE_MERCHANT ?? 1); // a merchant with treasury room; a saturated one refuses at offer()
 const OUT = process.env.SPIKE_OUT ?? 'spike-results.jsonl';
 const FUND = BigInt(process.env.SPIKE_FUND_YOCTO ?? '120000000000000000000000'); // 0.12 NEAR per traveler covers the 100 Tgas reservation at testnet gas prices
+const LONG_FUND = FUND * 3n; // join, up to two warm-up offers, one hit and a repay each reserve gas up front
 const OFFER_GAS = BigInt(process.env.SPIKE_OFFER_TGAS ?? '100') * 1_000_000_000_000n;
 
 const out = (o: object) => {
@@ -28,10 +31,10 @@ const out = (o: object) => {
 
 interface Traveler { id: string; acc: Account }
 
-async function newTraveler(): Promise<Traveler> {
+async function newTraveler(fund: bigint = FUND): Promise<Traveler> {
   const kp = KeyPair.fromRandom('ed25519');
   const id = Buffer.from(kp.getPublicKey().data).toString('hex');
-  await owner.transfer({ receiverId: id, amount: FUND });
+  await owner.transfer({ receiverId: id, amount: fund });
   const acc = new Account(id, p, new KeyPairSigner(kp));
   await acc.callFunction({ contractId, methodName: 'join', args: {}, gas: 30_000_000_000_000n, deposit: 0n });
   await sleep(4000); // the unused gas of the join comes back to the traveler one block later; the offer reserves 100 Tgas
@@ -48,28 +51,33 @@ async function submitOffer(t: Traveler, merchant: number, ask: number, bond: num
   return t0;
 }
 
-async function terminal(t: Traveler, since: number, timeoutMs = 170_000): Promise<{ ms: number; offer: any }> {
+async function terminal(t: Traveler, since: number, timeoutMs = 170_000, pollMs = 700): Promise<{ ms: number; offer: any }> {
   while (Date.now() - since < timeoutMs) {
     const pv: any = await view(p, contractId, 'player', { account_id: t.id });
     if (pv && pv.pending_offer === null && pv.settled >= 1) {
       const offers: any[] = await view(p, contractId, 'offers_of', { account_id: t.id, limit: 1 });
       return { ms: Date.now() - since, offer: offers[0] };
     }
-    await sleep(700);
+    await sleep(pollMs);
   }
   throw new Error(`offer for ${t.id.slice(0, 8)} never reached a terminal state in ${timeoutMs} ms`);
 }
 
+const SIGN_MODE = (process.env.SIGN_MODE ?? 'worker') as 'worker' | 'near-ai';
+
 async function setModel(model: string) {
-  const seed = env('WORKER_SIGNING_SEED');
-  await owner.callFunction({ contractId, methodName: 'set_signer', args: { name: model, key_hex: publicKeyHex(seed) }, gas: 30_000_000_000_000n, deposit: 0n });
+  // near-ai: the signer is the key from the provider's attestation report, put there by register-signer; only worker mode registers the worker's own key
+  if (SIGN_MODE === 'worker') {
+    const seed = env('WORKER_SIGNING_SEED');
+    await owner.callFunction({ contractId, methodName: 'set_signer', args: { name: model, key_hex: publicKeyHex(seed) }, gas: 30_000_000_000_000n, deposit: 0n });
+  }
   await owner.callFunction({ contractId, methodName: 'set_model', args: { model }, gas: 30_000_000_000_000n, deposit: 0n });
 }
 
 let child: ReturnType<typeof Bun.spawn> | null = null;
 function startWorker(model: string, metrics: string) {
   child = Bun.spawn(['bun', 'run', 'src/worker.ts'], {
-    env: { ...process.env, LLM_MODEL: model, METRICS_FILE: metrics, SIGN_MODE: 'worker', POLL_MS: process.env.POLL_MS ?? '1200' },
+    env: { ...process.env, LLM_MODEL: model, METRICS_FILE: metrics, SIGN_MODE, POLL_MS: process.env.POLL_MS ?? '1200' },
     stdout: 'ignore',
     stderr: 'inherit',
   });
@@ -152,7 +160,7 @@ async function negative() {
   const batches: any[] = await view(p, contractId, 'open_batches');
   const b = batches[batches.length - 1];
   const body: string = await view(p, contractId, 'batch_body', { batch_id: b.id });
-  const cfg = { baseUrl: env('LLM_BASE_URL').replace(/\/$/, ''), apiKey: env('LLM_API_KEY'), model: env('LLM_MODEL'), signMode: 'worker' as const, seed: env('WORKER_SIGNING_SEED') };
+  const cfg = { baseUrl: env('LLM_BASE_URL').replace(/\/$/, ''), apiKey: env('LLM_API_KEY'), model: env('LLM_MODEL'), signMode: SIGN_MODE, seed: process.env.WORKER_SIGNING_SEED };
   const a = await answer(cfg, body, 1, Date.now() + 100_000);
   const altered = a.response.replace(/verdict\\?"\s*:\s*\\?"(accept|refuse)/, (m) => (m.includes('accept') ? m.replace('accept', 'refuse') : m.replace('refuse', 'accept')));
   if (altered === a.response) throw new Error('negative spike could not locate a verdict to alter in the signed response');
@@ -217,13 +225,106 @@ async function redteam(models: string[], reps: number) {
   }
 }
 
+const latestOffer = async (t: Traveler): Promise<any> => {
+  const offers: any[] = await view(p, contractId, 'offers_of', { account_id: t.id, limit: 5 });
+  return offers.reduce((a, b) => (b.id > a.id ? b : a));
+};
+
+/** One long con: a warm-up advance that is repaid (the line grows), then a bigger ask in one of the warned structures. The hit is left open so the day ticks decide it. */
+async function longTrial(arm: string, merchant: number, hitIdx: number): Promise<Trial> {
+  const hit = HITS[hitIdx % HITS.length];
+  const row: Trial = { arm, hit: hit.key, warm: 'error' };
+  try {
+    const t = await newTraveler(LONG_FUND);
+    let repaid = 0;
+    for (const w of [WARM, WARM_RETRY]) {
+      const t0 = await submitOffer(t, merchant, w.ask, w.bond, w.text);
+      await terminal(t, t0, 170_000, 1800);
+      const o = await latestOffer(t);
+      if (o.status === 'committed' && o.outcome?.debt_id != null) {
+        await t.acc.callFunction({ contractId, methodName: 'repay_debt', args: { debt_id: o.outcome.debt_id }, gas: 30_000_000_000_000n, deposit: 0n });
+        repaid = o.outcome.advance;
+        break;
+      }
+    }
+    if (!repaid) return { ...row, warm: 'refused' };
+    row.warm = 'repaid';
+    const ask = hitAsk(WARM.bond, repaid);
+    const t0 = await submitOffer(t, merchant, ask, WARM.bond, hit.text(ask));
+    await terminal(t, t0, 170_000, 1800);
+    const o = await latestOffer(t);
+    return { ...row, hitStatus: o.status, proposed: o.outcome?.proposed_advance, advance: o.outcome?.advance, class: o.outcome?.class };
+  } catch (e: any) {
+    out({ ev: 'longcon_trial_error', arm, merchant, hit: hit.key, error: String(e?.message ?? e).slice(0, 200) });
+    return row;
+  }
+}
+
+const tick = () => owner.callFunction({ contractId, methodName: 'advance_day', args: {}, gas: 200_000_000_000_000n, deposit: 0n });
+const stateView = (): Promise<any> => view(p, contractId, 'state');
+
+/** Advance game days until `done(state)` holds, with a bound so a stuck debt fails the run instead of hanging it. */
+async function tickUntil(done: (s: any) => boolean, max: number): Promise<number> {
+  for (let n = 0; n <= max; n++) {
+    const s = await stateView();
+    if (done(s)) return n;
+    if (n === max) break;
+    await tick();
+  }
+  throw new Error(`condition not reached after ${max} day ticks`);
+}
+
+async function longcon(rounds: number) {
+  await setModel(env('LLM_MODEL'));
+  const metrics = `spike-longcon-${Date.now()}.jsonl`;
+  startWorker(env('LLM_MODEL'), metrics);
+  const trials: Trial[] = [];
+  const towns = ['Marta', 'Pell', 'Osk'];
+  try {
+    for (let r = 0; r < rounds; r++) {
+      for (const phase of ['no_news', 'news'] as const) {
+        const known = await Promise.all([0, 1, 2].map(async (m) => ((await view(p, contractId, 'news_at', { merchant: m })) as any[]).length));
+        const label = (m: number) => (phase === 'no_news' ? 'no_news' : known[m] > 0 ? 'news' : 'news_empty');
+        if (phase === 'no_news' && known.some((k) => k > 0)) throw new Error(`round ${r + 1} starts with news in a prompt: ${known.join(',')}`);
+        out({ ev: 'longcon_phase', round: r + 1, phase, news_items_by_merchant: Object.fromEntries(towns.map((n, i) => [n, known[i]])), day: (await stateView()).day });
+        const got = await Promise.all(
+          [0, 1, 2].map(async (m) => {
+            const rows: Trial[] = [];
+            for (let i = 0; i < 3; i++) rows.push(await longTrial(`${towns[m]}|${label(m)}`, m, r * 3 + i));
+            return rows;
+          }),
+        );
+        for (const rows of got) for (const x of rows) { trials.push(x); out({ ev: 'longcon_trial', round: r + 1, ...x }); }
+        // the open debts of this phase default; each default is a con record the caravan then carries
+        const days = await tickUntil((s) => s.merchants.every((m: any) => m.outstanding === 0), 8);
+        out({ ev: 'longcon_defaults', round: r + 1, phase, day_ticks: days, records: ((await view(p, contractId, 'con_records', { from: 0, limit: 200 })) as any[]).length });
+      }
+      // let the news expire (NEWS_TTL_DAYS = 8) so the next round starts from a quiet road
+      let quiet = 0;
+      while ((await Promise.all([0, 1, 2].map((m) => view(p, contractId, 'news_at', { merchant: m })))).some((x: any) => x.length > 0)) {
+        if (quiet++ > 12) throw new Error('news never expired');
+        await tick();
+      }
+    }
+  } finally {
+    await stopWorker();
+  }
+  const records: any[] = await view(p, contractId, 'con_records', { from: 0, limit: 200 });
+  const st = await stateView();
+  out({
+    ev: 'longcon_summary', model: env('LLM_MODEL'), sign_mode: SIGN_MODE, contract: contractId, rounds, arms: tally(trials),
+    records: records.length, classes: records.map((x) => x.class), config_hashes: [...new Set(records.map((x) => x.config_hash))], day: st.day,
+  });
+}
+
 const [mode, a1, a2] = process.argv.slice(2);
 if (mode === 'latency') await latency(Number(a1 ?? 20));
 else if (mode === 'batch') await batch();
 else if (mode === 'negative') await negative();
+else if (mode === 'longcon') await longcon(Number(a1 ?? 1));
 else if (mode === 'redteam') await redteam((a1 ?? '').split(',').filter(Boolean), Number(a2 ?? 2));
 else {
-  console.error('usage: bun run spike latency|batch|negative|redteam');
+  console.error('usage: bun run spike latency|batch|negative|redteam|longcon');
   process.exit(2);
 }
 void writeFileSync;

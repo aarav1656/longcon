@@ -23,7 +23,7 @@ for a in game owner worker relay; do
     near account create-account sponsor-by-faucet-service "$id" autogenerate-new-keypair save-to-legacy-keychain network-config testnet create
   fi
 done
-"$root/scripts/build-wasm.sh" "$root/target/wasm"
+[ -n "${SKIP_BUILD:-}" ] && test -f "$root/target/wasm/longcon.wasm" || "$root/scripts/build-wasm.sh" "$root/target/wasm"
 near contract deploy "$PREFIX-game.testnet" use-file "$root/target/wasm/longcon.wasm" \
   with-init-call new json-args "{\"owner\":\"$PREFIX-owner.testnet\",\"model\":\"$MODEL\",\"day_length_ms\":$DAY_MS,\"treasury\":100,\"grain\":50}" \
   prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' network-config "$NETCFG" sign-with-legacy-keychain send

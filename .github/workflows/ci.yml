@@ -24,6 +24,15 @@ jobs:
           echo "e959f2170af4c20c552e9de3a0253704d6a9d2766e8fdb88e4d6ac4bae9388fe  /tmp/binaryen.tgz" | sha256sum -c -
           sudo tar xzf /tmp/binaryen.tgz -C /opt
           echo "/opt/binaryen-version_123/bin" >> "$GITHUB_PATH"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - name: docs check
+        run: scripts/check-docs.sh
+      - name: client tests
+        run: |
+          (cd worker && bun install --frozen-lockfile && bun test ./test)
+          (cd web && bun install --frozen-lockfile && bun test ./test)
       - name: layout check
         run: |
           if [ ! -f Cargo.toml ]; then

@@ -68,8 +68,8 @@ Source: [Reddit comment](https://www.reddit.com/r/aigamedev/comments/1v2enqh/mad
 
 Why adjacent and adversarial: this is a direct test of whether the loop has a reason to return, but it is not a positive request for Long Con.
 
-## Search and source limits
+## Sources searched
 
-Exa search was run for persistent NPC memory, gossip, consequences, and repetitive AI game loops. Exa hit its free MCP rate limit after the first calls and fell back to Parallel. RivalSearch social_search was run across Reddit, Hacker News, and Product Hunt. Parallel web_search and web_fetch lanes were run. The Reddit page fetch through Jina returned 403, so the two Reddit comments were fetched through the public PullPush comment endpoint and their source URLs were opened separately. `papers search` was run twice on LLM NPC memory and agent safety queries, but OpenAlex, arXiv, and Semantic Scholar returned no results. Existing paper evidence remains in `docs/PRIOR-ART.md` and is not counted as a person quote.
+Exa, Parallel web search and fetch, RivalSearch social search across Reddit, Hacker News and Product Hunt, and `papers search` on LLM NPC memory and agent safety. The two Reddit comments were fetched from the public PullPush comment endpoint and their source URLs opened separately. Paper evidence lives in `docs/PRIOR-ART.md` and is not counted as a person quote.
 
 Conclusion: 3 exact-pain people found, 3 adjacent people found. No evidence found that any named person wants a chain, NEAR, tokens, or a contract ledger.

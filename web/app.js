@@ -151,22 +151,18 @@ async function main() {
 
   const readAt = { blockHeight: blockHeight, timestamp: timestamp, explorer: explorer };
 
-  // merchants
+  let st = null;
   try {
-    const st = await callFunction(contractId, 'state', {}, rpcUrl);
+    st = await callFunction(contractId, 'state', {}, rpcUrl);
     readAt.blockHeight = st.blockHeight || readAt.blockHeight;
     renderMerchants(merchantsEl, st.value, readAt);
   } catch (e) {
     showError(merchantsEl, 'Could not read merchants: ' + (e && e.message ? e.message : String(e)), 'Check the contract id and RPC URL, or run the local road: PREFIX=mygame scripts/testnet-up.sh');
   }
 
-  // con records
   try {
-    const st = await callFunction(contractId, 'state', {}, rpcUrl);
-    const from = 0;
-    const limit = 50;
-    const recs = await callFunction(contractId, 'con_records', { from: from, limit: limit }, rpcUrl);
-    const towns = (st.value && st.value.rules && Array.isArray(st.value.rules.towns)) ? st.value.rules.towns : [];
+    const recs = await callFunction(contractId, 'con_records', { from: 0, limit: 50 }, rpcUrl);
+    const towns = (st && st.value && st.value.rules && Array.isArray(st.value.rules.towns)) ? st.value.rules.towns : [];
     readAt.blockHeight = recs.blockHeight || readAt.blockHeight;
     renderRecords(recordsEl, recs.value, towns, readAt);
   } catch (e) {

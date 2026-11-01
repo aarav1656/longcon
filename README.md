@@ -1,5 +1,7 @@
 # Long Con
 
+[![ci](https://github.com/kamalbuilds/near-longcon/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kamalbuilds/near-longcon/actions/workflows/ci.yml)
+
 A free browser game on a NEAR contract. Three AI merchants on a road of three towns lend gold that is real contract state. You pitch a merchant a story and ask for an advance. The merchant's model proposes terms, the contract proves which model answered, and the contract clamps the terms to limits no pitch can move. Repay and your credit line grows. Default and your bond burns, the merchant books the loss, and the contract writes a con record that the next town reads one game day later.
 
 Built at NEAR HACKATHON. Tracks: games, security.
@@ -10,23 +12,38 @@ Games that let you talk an AI out of a prize keep their rules on a private serve
 
 ## Try it
 
-Prerequisites: Rust nightly with `wasm32-unknown-unknown`, `cargo-near` 0.16, `near-cli-rs` 0.20, `wasm-opt`, `bun` 1.4, `jq`.
+Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `wasm-opt` (binaryen 123), `bun` 1.4, `jq`, `python3`.
 
 1. Run the contract suite from a clean clone: `cargo test --workspace`.
    See `test result: ok` for the unit tests and for each sandbox binary (attestation, batch, clamps, guards, lifecycle, rumours, sybil). The sandbox runs the real wasm through real receipts.
 2. Run the client tests: `(cd worker && bun install && bun test ./test) && (cd web && bun install && bun test ./test)`.
    See `0 fail` twice.
-3. Build the contract: `cd contract && cargo near build non-reproducible-wasm`.
-   See `Contract successfully built` and the ABI path.
+3. Build the contract wasm the tests and the deploy script use: `scripts/build-wasm.sh`.
+   See `target/wasm/longcon.wasm` listed with its size.
 4. Give the merchants a model: `cp .env.example .env`, then place your own endpoint and key in `.env` (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `SIGN_MODE`). NEAR AI Cloud with `SIGN_MODE=near-ai` is the default shape.
 5. Deploy your own road to testnet: `PREFIX=mygame LLM_MODEL=<your model id> scripts/testnet-up.sh`.
    See four faucet funded accounts (`mygame-game.testnet` is the contract) and `The "new" call ... succeeded`.
 6. Register the key the contract trusts for that model: `PREFIX=mygame scripts/register-signer.sh`.
    See `signer_set` and `model_set` lines.
-7. Play: `PREFIX=mygame scripts/play.sh`, then open http://127.0.0.1:5173.
+7. Play: `PREFIX=mygame scripts/play.sh`, then open http://127.0.0.1:5173/game.html.
    Pick Marta, press a pitch starter, press Pitch. See the verdict panel show what the merchant offered, what the road allowed, and which cap cut it. Press End day twice after taking an advance and see the debt default, your bond burn and a record appear in the con ledger. Pitch the next town and see its merchant carry the news.
 
+8. Read the road without a build: `python3 -m http.server 8080 --directory web`, then open http://127.0.0.1:8080/?contract=mygame-game.testnet.
+   See three merchants with treasuries and open advances, each panel stamped with the block it was read at, and every con record once a debt has defaulted.
+
 A reference road is deployed at `longcon-game.testnet`. Read it with `near contract call-function as-read-only longcon-game.testnet state json-args {} network-config testnet now`.
+
+## Ledger page
+
+`web/index.html` is a static page that reads the contract straight from the NEAR RPC: no build step, no packages, no server of ours. It shows what the contract holds and nothing else.
+
+| Panel | Endpoint | What it shows |
+|---|---|---|
+| Merchants and treasuries | `call_function` `state` on the contract, `finality: final` | Each merchant's gold, grain, buy and sell prices, open advances, gold lost to cons, the daily loss cap and the treasury cap |
+| Con records | `call_function` `con_records` with `from: 0, limit: 50` | Every landed con: class, town, day, principal, bond burned, and the request, response and configuration hashes that bind it to a signed answer |
+| Read stamp | `block` with `finality: final` | The block height and time of the read, printed under each panel |
+
+Open it with `python3 -m http.server 8080 --directory web` and browse to `/`, or to `/?contract=<account id>` for any road. The default road comes from `web/public/config.json`. The playable client is `web/game.html`.
 
 ## How it works
 
@@ -63,5 +80,6 @@ The team also enters Voucher, Overdraft and Receipts. Long Con shares no TEE, DC
 | `contract/` | The NEAR contract: `lib.rs`, `rules.rs` (every cap), `attest.rs`, `prompt.rs`, `rumour.rs`, `types.rs` |
 | `tests/` | Sandbox suite on `near-workspaces` |
 | `worker/` | Merchant worker, delegate relayer, signer registration, testnet measurement tool |
-| `web/` | The game client |
+| `web/` | `index.html` the ledger page, `game.html` the playable client |
+| `AGENTS.md` | Install, test, run and rules for coding agents |
 | `scripts/` | Testnet deploy, signer registration, one-command play, wasm build, mutation runner |

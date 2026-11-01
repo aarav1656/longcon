@@ -18,12 +18,6 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - name: install binaryen 123
-        run: |
-          curl -sSL -o /tmp/binaryen.tgz https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-linux.tar.gz
-          echo "e959f2170af4c20c552e9de3a0253704d6a9d2766e8fdb88e4d6ac4bae9388fe  /tmp/binaryen.tgz" | sha256sum -c -
-          sudo tar xzf /tmp/binaryen.tgz -C /opt
-          echo "/opt/binaryen-version_123/bin" >> "$GITHUB_PATH"
       - name: layout check
         run: |
           if [ ! -f Cargo.toml ]; then
@@ -32,7 +26,7 @@ jobs:
           fi
       - name: build wasm
         run: |
-          scripts/build-wasm.sh target/wasm
+          cargo build --workspace --release --target wasm32-unknown-unknown
       - name: test
         run: |
           cargo test --workspace --no-fail-fast

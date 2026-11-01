@@ -2,11 +2,13 @@ const params = new URLSearchParams(location.search);
 
 async function loadConfig() {
   let fileCfg = {};
-  try {
-    const r = await fetch('config.json', { cache: 'no-store' });
-    if (r.ok) fileCfg = await r.json();
-  } catch (e) {
-    // config.json is optional; query params can still configure the page
+  for (const path of ['config.json', 'public/config.json']) {
+    try {
+      const r = await fetch(path, { cache: 'no-store' });
+      if (r.ok) { fileCfg = await r.json(); break; }
+    } catch (e) {
+      // try the next location; query params can still configure the page
+    }
   }
   const cfg = Object.assign({}, fileCfg);
   if (params.get('contract')) cfg.contract_id = params.get('contract');

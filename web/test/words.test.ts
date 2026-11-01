@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { checkPitch, classLabel, clampSentence, esc, nextMove, shortId } from '../src/words.ts';
+import { checkPitch, classLabel, clampSentence, esc, nextMove, shortId, answeredLine, txUrl } from '../src/words.ts';
 
 test('every clamp tag the contract can emit has its own sentence', () => {
   const tags = ['ask', 'exposure', 'daily_loss', 'treasury_30pct', 'merchant_gold', 'due_days', 'repay_floor', 'repay_ceiling', 'sell_quote', 'buy_quote'];
@@ -47,4 +47,16 @@ test('news travels one town per day, same as the contract clock', () => {
   expect(newsArrives(5, 0, 1)).toBe(6);
   expect(newsArrives(5, 0, 2)).toBe(7);
   expect(newsArrives(5, 2, 0)).toBe(7);
+});
+
+test('the answered line states seconds with one decimal under ten and is empty when the turn was not watched', () => {
+  expect(answeredLine(8460)).toBe('Answered in 8.5 s. ');
+  expect(answeredLine(26100)).toBe('Answered in 26 s. ');
+  expect(answeredLine(0)).toBe('');
+  expect(answeredLine(Number.NaN)).toBe('');
+});
+
+test('txUrl joins the explorer and the hash without doubling the slash', () => {
+  expect(txUrl('https://testnet.nearblocks.io/', 'AbC')).toBe('https://testnet.nearblocks.io/txns/AbC');
+  expect(txUrl('https://testnet.nearblocks.io', 'AbC')).toBe('https://testnet.nearblocks.io/txns/AbC');
 });

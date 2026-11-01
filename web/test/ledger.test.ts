@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 // app.js is a plain browser script. Run it against a document with no elements so main() exits early and the render functions can be called.
 const src = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
-const lib = new Function('document', 'location', 'fetch', `${src}; return { renderMerchants, renderRecords, rpcCall };`)(
+const lib = new Function('document', 'location', 'fetch', `${src}; return { renderMerchants, renderRecords, renderSigners, rpcCall };`)(
   { getElementById: () => null },
   { search: '' },
   (...a: unknown[]) => fetchImpl(...a),
@@ -66,4 +66,20 @@ test('rpcCall gives up with a rate limit message after six tries and does not re
   fetchImpl = async () => { calls++; return reply(200, { error: { code: -32000, message: 'bad' } }); };
   await expect(lib.rpcCall('http://rpc', 'block', {}, 1)).rejects.toThrow('-32000');
   expect(calls).toBe(1);
+});
+
+test('the signer panel prints every registered key and marks the road model', () => {
+  const e = el();
+  const key = 'f09a1eb8d850aab7393bcbd03020fba53f452cb7efc8fc57eeeb9c115761f3aa';
+  lib.renderSigners(e, { model: 'm/a', signers: [['m/a', key], ['m/b', 'ab'.repeat(32)]] }, readAt);
+  expect(e.innerHTML).toContain(key);
+  expect(e.innerHTML).toContain('m/b');
+  expect(e.innerHTML.match(/the road&#39;s model|the road's model/g)?.length).toBe(1);
+  expect(e.innerHTML).toContain('model:sha256(request):sha256(response)');
+});
+
+test('with no registered key the signer panel says the contract accepts no answer', () => {
+  const e = el();
+  lib.renderSigners(e, { model: 'm/a', signers: [] }, readAt);
+  expect(e.innerHTML).toContain('accepts no merchant answer');
 });

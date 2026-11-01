@@ -1,6 +1,6 @@
 import './style.css';
 import { Chain, Config, explain, identity, loadConfig } from './chain.ts';
-import { checkPitch, classLabel, classShort, clampSentence, esc, nextMove, newsArrives, shortId, STATUS_LABEL } from './words.ts';
+import { checkPitch, classLabel, classShort, clampSentence, esc, nextMove, newsArrives, shortId, STATUS_LABEL, txUrl, answeredLine } from './words.ts';
 
 interface Merchant { id: number; name: string; town: number; gold: number; grain: number; outstanding: number; buy_price: number; sell_price: number; lost_total: number; town_name: string; treasury_room: number; due_exposure: number[] }
 interface Rules { loss_cap_per_day: number; treasury_cap_pct: number; max_due_days: number; max_interest_pct: number; max_ask: number; gold_stipend: number; towns: string[] }
@@ -47,6 +47,9 @@ let busy = '';
 let errMsg = '';
 let onboardErr = '';
 let pendingSince = 0;
+let answeredMs = 0;
+const TX_KEY = 'longcon.offer-tx';
+const offerTx: Record<string, string> = JSON.parse(localStorage.getItem(TX_KEY) ?? '{}');
 let ready = false;
 
 function skeleton() {
@@ -209,7 +212,7 @@ function renderVerdict() {
     ${oc.clamps.length ? `<ul class="why">${oc.clamps.map((c) => `<li>${esc(clampSentence(c))}</li>`).join('')}</ul>` : o.status === 'committed' ? '<p class="hint">Nothing was clamped: the offer sat inside every limit.</p>' : ''}
     ${o.status === 'committed' ? `<p>Repay <b>${oc.repay}</b> gold (${interest} interest) by the end of day <b>${oc.due_day}</b>, or your ${o.bond} gold bond burns and a con lands in the ledger as ${esc(classLabel(oc.class))}.</p>` : ''}
     ${o.status === 'refused' ? `<p>The road filed this pitch as ${esc(classLabel(oc.class))}. Your bond is back in your purse.</p>` : ''}
-    <p class="fine" style="margin-top:12px">${oc.signer ? `Answer signed by ${esc(oc.signer)}. ` : ''}Response ${esc(shortId(oc.response_hash, 10, 6))}. Request ${esc(shortId(o.request_hash, 10, 6))}.</p>`;
+    <p class="fine" style="margin-top:12px">${offerTx[o.id] ? `<a href="${esc(txUrl(cfg.explorer, offerTx[o.id]))}" target="_blank" rel="noreferrer">Your pitch transaction</a>. ` : ''}${esc(answeredLine(answeredMs))}${oc.signer ? `Answer signed by ${esc(oc.signer)}. ` : ''}Response ${esc(shortId(oc.response_hash, 10, 6))}. Request ${esc(shortId(o.request_hash, 10, 6))}.</p>`;
 }
 
 function renderMine() {
@@ -274,7 +277,8 @@ async function refresh() {
     pv = p;
     if (p?.pending_offer) {
       if (!pendingSince) pendingSince = Date.now();
-    } else {
+    } else if (busy !== 'offer') {
+      if (pendingSince) answeredMs = Date.now() - pendingSince;
       pendingSince = 0;
     }
     const key = `${s.day}:${s.records}:${p?.offers_total ?? 0}:${p?.pending_offer ?? 0}:${p?.cons_landed ?? 0}`;
@@ -320,12 +324,20 @@ async function onboard() {
 async function act(name: string, args: Record<string, unknown>, label: string) {
   busy = label;
   errMsg = '';
+  if (name === 'offer') { pendingSince = Date.now(); answeredMs = 0; }
   renderAll();
   try {
-    await chain.send(name, args);
-    for (let i = 0; i < 6; i++) { await new Promise((r) => setTimeout(r, 900)); seenKey = ''; await refresh(); }
+    const { tx } = await chain.send(name, args);
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 900)); seenKey = ''; await refresh();
+      if (name === 'offer' && tx && pv?.pending_offer && !offerTx[pv.pending_offer]) {
+        offerTx[pv.pending_offer] = tx;
+        localStorage.setItem(TX_KEY, JSON.stringify(offerTx));
+      }
+    }
   } catch (e: any) {
     errMsg = explain(String(e?.message ?? e)).slice(0, 200);
+    if (name === 'offer') { pendingSince = 0; answeredMs = 0; }
   } finally {
     busy = '';
     seenKey = '';

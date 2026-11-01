@@ -95,3 +95,12 @@ export const distance = (a: number, b: number): number => Math.abs(a - b);
 
 /** Mirrors contract rules.rs news_arrives: a con landed on `day` in town `origin` is known in `town` from this day. */
 export const newsArrives = (day: number, origin: number, town: number): number => day + distance(origin, town);
+
+/** The line under a verdict: how long the turn took from the pitch to the contract's answer. Empty when this page did not watch the turn. */
+export function answeredLine(ms: number): string {
+  if (!(ms > 0)) return '';
+  return `Answered in ${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)} s. `;
+}
+
+/** Explorer page for a transaction the relayer submitted for the player. */
+export const txUrl = (explorer: string, tx: string): string => `${explorer.replace(/\/+$/, '')}/txns/${tx}`;

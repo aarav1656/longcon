@@ -179,3 +179,6 @@ pre {
   color: var(--muted);
   margin-top: 12px;
 }
+
+.kv.stack { grid-template-columns: 1fr; }
+.kv.stack dd { text-align: left; overflow-wrap: anywhere; font-size: 13px; margin-bottom: 8px; }

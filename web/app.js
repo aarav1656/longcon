@@ -30,16 +30,31 @@ function defaultExplorer(network) {
     : 'https://testnet.nearblocks.io';
 }
 
-async function rpcCall(rpcUrl, method, rpcParams) {
-  const r = await fetch(rpcUrl, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 'longcon-demo', method: method, params: rpcParams })
-  });
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
-  const j = await r.json();
-  if (j.error) throw new Error(JSON.stringify(j.error));
-  return j.result;
+// The public RPC answers a burst with 429 (a browser reports that as a CORS failure) or with a JSON-RPC -429 body. Ask again after a growing pause.
+async function rpcCall(rpcUrl, method, rpcParams, pauseMs) {
+  const pause = pauseMs == null ? 800 : pauseMs;
+  let last = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    if (attempt) await new Promise(function (res) { setTimeout(res, pause * attempt); });
+    let r;
+    try {
+      r = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 'longcon-demo', method: method, params: rpcParams })
+      });
+    } catch (e) {
+      last = new Error('the RPC did not answer (rate limited or offline)');
+      continue;
+    }
+    if (r.status === 429) { last = new Error('the RPC is rate limiting this page'); continue; }
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+    const j = await r.json();
+    if (j.error && j.error.code === -429) { last = new Error('the RPC is rate limiting this page'); continue; }
+    if (j.error) throw new Error(JSON.stringify(j.error));
+    return j.result;
+  }
+  throw last;
 }
 
 async function callFunction(contractId, methodName, args, rpcUrl) {

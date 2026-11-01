@@ -3,11 +3,12 @@ import { readFileSync } from 'node:fs';
 
 // app.js is a plain browser script. Run it against a document with no elements so main() exits early and the render functions can be called.
 const src = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
-const lib = new Function('document', 'location', 'fetch', `${src}; return { renderMerchants, renderRecords };`)(
+const lib = new Function('document', 'location', 'fetch', `${src}; return { renderMerchants, renderRecords, rpcCall };`)(
   { getElementById: () => null },
   { search: '' },
-  () => Promise.reject(new Error('no network in unit tests')),
+  (...a: unknown[]) => fetchImpl(...a),
 );
+let fetchImpl: (...a: unknown[]) => Promise<unknown> = () => Promise.reject(new Error('no network in unit tests'));
 const el = () => ({ innerHTML: '' });
 const readAt = { blockHeight: 275716181, timestamp: '2026-11-01T07:14:27.418Z', explorer: 'https://testnet.nearblocks.io' };
 const towns = ['Millford', 'Pellgate', 'Oskmoor'];
@@ -44,4 +45,25 @@ test('the default road in config.json is one that holds con records', () => {
   const cfg = JSON.parse(readFileSync(new URL('../public/config.json', import.meta.url), 'utf8'));
   expect(cfg.contract_id).toBe('longcon2-game.testnet');
   expect(cfg.rpc).toStartWith('https://');
+});
+
+const reply = (status: number, body: unknown) => ({ ok: status >= 200 && status < 300, status, statusText: 'x', json: async () => body });
+
+test('rpcCall asks again after a 429 and after a JSON-RPC -429 body, then returns the result', async () => {
+  const answers = [reply(429, {}), reply(200, { error: { code: -429 } }), reply(200, { result: { height: 7 } })];
+  let calls = 0;
+  fetchImpl = async () => { calls++; return answers.shift(); };
+  expect(await lib.rpcCall('http://rpc', 'block', {}, 1)).toEqual({ height: 7 });
+  expect(calls).toBe(3);
+});
+
+test('rpcCall gives up with a rate limit message after six tries and does not retry a real error', async () => {
+  let calls = 0;
+  fetchImpl = async () => { calls++; return reply(429, {}); };
+  await expect(lib.rpcCall('http://rpc', 'block', {}, 1)).rejects.toThrow('rate limiting');
+  expect(calls).toBe(6);
+  calls = 0;
+  fetchImpl = async () => { calls++; return reply(200, { error: { code: -32000, message: 'bad' } }); };
+  await expect(lib.rpcCall('http://rpc', 'block', {}, 1)).rejects.toThrow('-32000');
+  expect(calls).toBe(1);
 });

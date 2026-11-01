@@ -70,3 +70,19 @@ export function percentile(xs: number[], p: number): number {
   const s = [...xs].sort((a, b) => a - b);
   return s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))];
 }
+
+const ed25519Hex = (a: any): string | null =>
+  a?.signing_algo === 'ed25519' && typeof a.signing_address === 'string' ? a.signing_address.replace(/^0x/, '').toLowerCase() : null;
+
+/**
+ * The ed25519 keys the contract must trust, read from a NEAR AI Cloud attestation report requested with provider=near.
+ * Instances of one model share a single signing key, so several candidates with the same address are fine and several different addresses are refused.
+ */
+export function attestedSigners(rep: any): { model: string; gateway: string | null } {
+  const keys = new Set((rep?.model_attestations ?? []).map(ed25519Hex).filter((k: string | null): k is string => !!k));
+  if (keys.size === 0) throw new Error('attestation report has no ed25519 model signer');
+  if (keys.size > 1) throw new Error(`attestation report holds ${keys.size} different ed25519 model signers, refusing to pick one`);
+  const model = [...keys][0];
+  if (!/^[0-9a-f]{64}$/.test(model)) throw new Error('model signer is not 32 bytes of hex');
+  return { model, gateway: ed25519Hex(rep.gateway_attestation) };
+}

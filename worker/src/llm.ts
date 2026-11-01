@@ -25,7 +25,7 @@ async function post(cfg: LlmCfg, body: string): Promise<{ text: string; status: 
   return { text: await r.text(), status: r.status };
 }
 
-async function nearAiSignature(
+export async function nearAiSignature(
   cfg: LlmCfg,
   chatId: string,
   expected: (kind: SigKind) => string,
@@ -38,6 +38,11 @@ async function nearAiSignature(
     const raw = await r.text();
     if (r.ok) {
       const j = JSON.parse(raw);
+      if (j.error_code || !j.signature) {
+        last = `unavailable ${String(j.error_code ?? 'no signature')} ${String(j.message ?? '').slice(0, 100)}`; // a 2xx carrying error_code is not a signature yet
+        await sleep(700);
+        continue;
+      }
       const kind: SigKind = j.signature_kind === 'gateway' ? 'gateway' : 'provider_tee';
       if (j.text !== expected(kind)) throw new Error(`signed text ${String(j.text).slice(0, 90)} is not the hash of what we sent and received`);
       return { signature: String(j.signature).replace(/^0x/, ''), kind };

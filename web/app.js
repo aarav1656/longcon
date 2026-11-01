@@ -102,7 +102,7 @@ function renderMerchants(el, state, readAt) {
 
 function renderRecords(el, records, towns, readAt) {
   if (!Array.isArray(records) || records.length === 0) {
-    el.innerHTML = '<p class="empty">No con has landed yet.</p><p class="readat">Read at block ' + esc(readAt.blockHeight) + ', ' + esc(readAt.timestamp) + '</p>';
+    el.innerHTML = '<p class="empty">No con has landed on this road. One lands when a traveler repays a small advance, borrows again on that earned credit, and lets the second debt run past due. Open <code>?contract=longcon2-game.testnet</code> to read a road where ten have.</p><p class="readat">Read at block ' + esc(readAt.blockHeight) + ', ' + esc(readAt.timestamp) + '</p>';
     return;
   }
   el.innerHTML = records.map(function (r) {

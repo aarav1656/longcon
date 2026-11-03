@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { checkNearReport, verifiedSigners, type VerifiedQuote } from '../src/attest-check.ts';
+import { attestationRecord, checkNearReport, verifiedSigners, type VerifiedQuote } from '../src/attest-check.ts';
 
 // Fixture: a NEAR report and the quote an Intel verifier would return for it. The layout follows
 // https://docs.near.ai/cloud/verification/reference/quote-nonce-signer (report data = signer || nonce, MRCONFIGID = 01 || sha256(app_compose) || 15 zero bytes, RTMR3 replay).
@@ -81,8 +81,13 @@ test('registration reads the key only after the gateway and every model candidat
   const m = report({ intel_quote: '01' });
   const g = { ...gateway, intel_quote: '02' };
   const quotes = { '01': quote(), '02': gq };
-  const s = await verifiedSigners({ model_attestations: [m], gateway_attestation: g }, NONCE, ACCEPT, verifiedFor(quotes));
-  expect(s).toEqual({ model: KEY, gateway: 'cd'.repeat(32) });
+  const source = { model_attestations: [m], gateway_attestation: g };
+  const s = await verifiedSigners(source, NONCE, ACCEPT, verifiedFor(quotes));
+  expect(s).toEqual({ model: KEY, gateway: 'cd'.repeat(32), tcb: { model: ['UpToDate'], gateway: 'UpToDate' } });
+  expect(attestationRecord({ ...source, model: 'm' }, NONCE, s, '2026-11-01T00:00:00.000Z')).toEqual({
+    model: 'm', model_signing_key: KEY, gateway_signing_key: 'cd'.repeat(32), request_nonce: NONCE,
+    fetched_at: '2026-11-01T00:00:00.000Z', tcb_status: { model: ['UpToDate'], gateway: 'UpToDate' }, report: source,
+  });
   await expect(verifiedSigners({ model_attestations: [m], gateway_attestation: g }, NONCE, ACCEPT, verifiedFor({ ...quotes, '02': quote({}, 'Revoked') }))).rejects.toThrow('TCB status Revoked');
   await expect(verifiedSigners({ model_attestations: [] }, NONCE, ACCEPT, ok(quote()))).rejects.toThrow('no model evidence');
 });

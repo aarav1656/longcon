@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { checkPitch, classLabel, clampSentence, esc, nextMove, shortId, answeredLine, txUrl } from '../src/words.ts';
+import { checkPitch, classLabel, clampSentence, esc, nextMove, shortId, answeredLine, txUrl, newsLines, sha256Hex, signedText, signatureValid } from '../src/words.ts';
 
 test('every clamp tag the contract can emit has its own sentence', () => {
   const tags = ['ask', 'exposure', 'daily_loss', 'treasury_30pct', 'merchant_gold', 'due_days', 'repay_floor', 'repay_ceiling', 'sell_quote', 'buy_quote'];
@@ -30,6 +30,30 @@ test('checkPitch rejects each bound the contract enforces and accepts a good pit
   expect(checkPitch('hi', 61, 5, 20, 60).ok).toBe(false);
   expect(checkPitch('hi', 10, 21, 20, 60).why).toContain('cannot bond');
   expect(checkPitch('é'.repeat(201), 10, 5, 20, 60).ok).toBe(false); // 402 bytes, 201 characters
+  expect(checkPitch('hi\u0001there', 10, 5, 20, 60).why).toBe('Remove control characters from the pitch.');
+  expect(checkPitch('line one\nline two', 10, 5, 20, 60).ok).toBe(true);
+});
+
+test('request hashing matches SHA-256 and changes after one byte changes', async () => {
+  expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  expect(await sha256Hex('abc')).not.toBe(await sha256Hex('abd'));
+});
+
+test('request news stops before traveler pitch text', async () => {
+  const body = await Bun.file(new URL('./fixtures/body-news.json', import.meta.url)).text();
+  expect(newsLines(body)).toEqual(['- day 5 at Millford: a future_cargo pitch won an advance of 12 gold and the traveler defaulted.']);
+  expect(newsLines(await Bun.file(new URL('./fixtures/body-no-news.json', import.meta.url)).text())).toEqual([]);
+});
+
+test('browser signature verification accepts the signer and rejects one changed byte', async () => {
+  const kp = (await import('near-api-js')).KeyPair.fromRandom('ed25519');
+  const text = signedText('provider_tee', 'm', 'a'.repeat(64), 'b'.repeat(64));
+  const signature = kp.sign(new TextEncoder().encode(text)).signature;
+  const sigHex = Array.from(signature, (b) => b.toString(16).padStart(2, '0')).join('');
+  const keyHex = Array.from(kp.getPublicKey().data, (b) => b.toString(16).padStart(2, '0')).join('');
+  expect(signatureValid('provider_tee', 'm', 'a'.repeat(64), 'b'.repeat(64), sigHex, keyHex)).toBe(true);
+  const altered = `${sigHex.slice(0, -2)}${sigHex.endsWith('00') ? '01' : '00'}`;
+  expect(signatureValid('provider_tee', 'm', 'a'.repeat(64), 'b'.repeat(64), altered, keyHex)).toBe(false);
 });
 
 test('nextMove walks a new player from account to pitch to debt', () => {

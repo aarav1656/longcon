@@ -134,6 +134,34 @@ async fn the_day_cannot_be_forced_before_it_ends_or_by_strangers() -> Result<()>
 }
 
 #[tokio::test]
+async fn advance_day_handles_45_defaults_under_150_tgas() -> Result<()> {
+    let w = World::new(Cfg { treasury: 1000, ..Cfg::default() }).await?;
+    let players = w.fresh_players("gas", 45).await?;
+    let mut offers = vec![Vec::new(), Vec::new(), Vec::new()];
+    for (i, p) in players.iter().enumerate() {
+        offers[i % 3].push(w.open_offer(p, (i % 3) as u8, 1, 1, "small advance").await?);
+    }
+    let terms = terms("accept", 1, 1, 1, "other");
+    for (merchant, waiting) in offers.into_iter().enumerate() {
+        let mut waiting = waiting.into_iter();
+        loop {
+            let chunk = waiting.by_ref().take(8).collect::<Vec<_>>();
+            if chunk.is_empty() { break; }
+            let batch = w.seal_raw(merchant as u8).await?.into_result()?.json::<u64>()?;
+            w.answer_batch(batch, &vec![terms.clone(); chunk.len()]).await?.into_result()?;
+            for offer in chunk { offer.status.await?.into_result()?; }
+        }
+    }
+    w.advance_day(&players[0]).await?.into_result()?;
+    let receipt = w.advance_day(&players[0]).await?.into_result()?;
+    let gas_tgas = receipt.total_gas_burnt.as_gas() / 1_000_000_000_000;
+    println!("45-default advance_day gas_burnt: {gas_tgas} Tgas");
+    assert_eq!(w.view("con_records", json!({"from": 0, "limit": 50})).await?.as_array().unwrap().len(), 45);
+    assert!(gas_tgas <= 150, "advance_day burned {gas_tgas} Tgas for 45 defaults");
+    Ok(())
+}
+
+#[tokio::test]
 async fn gold_and_grain_are_conserved_across_random_play() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let mut rng = StdRng::seed_from_u64(7);

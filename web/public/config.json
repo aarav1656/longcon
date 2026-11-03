@@ -1,5 +1,5 @@
 {
-  "contract_id": "longcon2-game.testnet",
+  "contract_id": "longcon3-game.testnet",
   "network": "testnet",
   "rpc": "https://test.rpc.fastnear.com",
   "relayer": "http://127.0.0.1:8787",

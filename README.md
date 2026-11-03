@@ -1,29 +1,27 @@
 # Long Con
 
-[![ci](https://github.com/kamalbuilds/near-longcon/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kamalbuilds/near-longcon/actions/workflows/ci.yml)
-
-A free browser game on a NEAR contract. Three AI merchants on a road of three towns lend gold that is real contract state. You pitch a merchant a story and ask for an advance. The merchant's model proposes terms, the contract accepts an answer only when its ed25519 signature verifies against the key registered for the road's model, and the contract clamps the terms to limits no pitch can move. Repay and your credit line grows. Default and your bond burns, the merchant books the loss, and the contract writes a con record that the next town reads one game day later.
+A browser game on a NEAR testnet contract. Three AI merchants on a road of three towns lend gold held in contract state. You pitch a merchant a story and ask for an advance. The merchant's model proposes terms, the contract verifies an ed25519 signature against its registered signer, and the contract clamps the terms to limits no pitch can move. Repay and your credit line grows. Default and your bond burns, the merchant books the loss, and the contract writes a con record that can enter the next town's prompt one game day later.
 
 Built at NEAR HACKATHON. Tracks: games, security.
 
 ## The problem
 
-Games that let you talk an AI out of a prize keep their rules on a private server. A player cannot tell whether the model refused or the house did, and a trick that works once works forever, so the fun ends in about two hours. Long Con moves the rules into a contract: the model proposes, the contract decides, and every landed con becomes news that makes the next merchant harder to fool.
+Games that let you talk an AI into lending keep their rules on a private server. A player cannot tell whether the model refused or the house did. Long Con moves the lending rules into a contract: the model proposes, the contract decides, and a landed con becomes structured news that can enter the next town's prompt.
 
 ## See it live in one minute
 
-Needs only `python3` and a browser.
+Start the local testnet game with the commands below; the ledger page reads a contract directly from NEAR RPC.
 
 1. Serve the ledger page: `python3 -m http.server 8080 --directory web`.
-2. Open http://127.0.0.1:8080/.
-   See the line `Contract longcon2-game.testnet on testnet ... Read at block <height>`, three merchants (Marta, Pell, Osk) with treasuries, grain and open loans read from the contract, a Who signs the answers panel with the ed25519 key the contract trusts, and a Con records panel listing every landed con with its class, town, principal, bond burned and the request, response and configuration hashes.
+2. Open http://127.0.0.1:8080/?contract=mygame-game.testnet after running the testnet setup below.
+   See three merchants with treasuries, grain and open loans read from the contract, a signer panel, and con records with their request, response and configuration hashes.
 
 ## Try it
 
 Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `wasm-opt` (binaryen 123), `bun` 1.4, `jq`, `python3`.
 
 1. Run the contract suite from a clean clone: `cargo test --workspace`.
-   See `test result: ok` for the unit tests and for each sandbox binary (attestation, batch, clamps, guards, hardening, lifecycle, rumours, sybil). The sandbox runs the real wasm through real receipts.
+   See `test result: ok` for the unit tests and each sandbox binary. The suite currently contains 55 async sandbox tests across attestation, batch, clamps, guards, hardening, lifecycle, rumours and sybil. The sandbox runs the real wasm through real receipts.
 2. Run the client tests: `(cd worker && bun install && bun test ./test) && (cd web && bun install && bun test ./test)`.
    See `0 fail` twice.
 3. Build the contract wasm the tests and the deploy script use: `scripts/build-wasm.sh`.
@@ -31,15 +29,15 @@ Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `w
 4. Give the merchants a model: `cp .env.example .env`, then place your own endpoint and key in `.env` (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `SIGN_MODE`). NEAR AI Cloud with `SIGN_MODE=near-ai` is the default shape.
 5. Deploy your own road to testnet: `PREFIX=mygame LLM_MODEL=<your model id> scripts/testnet-up.sh`.
    See four faucet funded accounts (`mygame-game.testnet` is the contract) and `The "new" call ... succeeded`.
-6. Register the key the contract trusts for that model and the worker as a relayer: `PREFIX=mygame scripts/register-signer.sh`. With `SIGN_MODE=near-ai` the key comes from the NEAR AI Cloud attestation report only after the Intel TDX quote of the gateway and of every model candidate verifies and binds the key and the nonce the script sent.
-   See `signer_set`, `relayer_set` and `model_set` lines.
+6. Register the configured signer and the worker as a relayer: `PREFIX=mygame scripts/register-signer.sh`. In `near-ai` mode, registration verifies the Intel TDX quote of the gateway and every model candidate and checks the signer and nonce bindings before it registers their keys.
+   See the signer and road registration events.
 7. Play: `PREFIX=mygame scripts/play.sh`, then open http://127.0.0.1:5173/game.html.
-   Pick Marta, press a pitch starter, press Pitch. See the verdict panel show what the merchant offered, what the road allowed, and which cap cut it. Press End day twice after taking an advance and see the debt default, your bond burn and a record appear in the con ledger. Pitch the next town and see its merchant carry the news.
+   Pick Marta, press a pitch starter, press Pitch. See the verdict panel show what the merchant offered, what the road allowed, and which cap cut it. Press End day until the due day has passed to default, then once more for Pellgate to hear the news. Pitch the next town and read the news included in its request.
 
 8. Read your own road without a build: `python3 -m http.server 8080 --directory web`, then open http://127.0.0.1:8080/?contract=mygame-game.testnet.
    See three merchants with treasuries and open advances, each panel stamped with the block it was read at, and every con record once a debt has defaulted.
 
-The reference road is deployed at `longcon2-game.testnet` and carries landed cons. Read it with `near contract call-function as-read-only longcon2-game.testnet state json-args {} network-config testnet now`.
+The game and ledger default to `longcon3-game.testnet`. Set up that testnet road with step 5 before opening either page.
 
 ## Ledger page
 
@@ -48,11 +46,11 @@ The reference road is deployed at `longcon2-game.testnet` and carries landed con
 | Panel | Endpoint | What it shows |
 |---|---|---|
 | Merchants and treasuries | `call_function` `state` on the contract, `finality: final` | Each merchant's gold, grain, buy and sell prices, open advances, gold lost to cons, the daily loss cap and the treasury cap |
-| Who signs the answers | `call_function` `state`, field `signers` | Each signer name with the ed25519 key the contract verifies its answers against, and the road's model marked |
-| Con records | `call_function` `con_records` with `from: 0, limit: 50` | Every landed con: class, town, day, principal, bond burned, and the request, response and configuration hashes that bind it to a signed answer |
+| Who signs the answers | `call_function` `state`, field `signers` | Each signer name with the ed25519 key the contract verifies its answers against, and the road's model marked. The page compares registered keys with a published attestation report when one is present. |
+| Con records | `call_function` `con_records` with `from: 0, limit: 50` | Landed cons: class, town, day, principal, bond burned, and request, response and configuration hashes |
 | Read stamp | `block` with `finality: final` | The block height and time of the read, printed under each panel |
 
-Open it with `python3 -m http.server 8080 --directory web` and browse to `/`, or to `/?contract=<account id>` for any road, with `&rpc=<url>` and `&network=mainnet|testnet` to point it elsewhere. The default road, `longcon2-game.testnet`, comes from `web/public/config.json`. Each panel prints the block height and time it was read at. A road with no landed con shows how one lands and which road to open instead. The playable client is `web/game.html`; `(cd web && bun test ./test)` covers the page's rendering.
+Open it with `python3 -m http.server 8080 --directory web` and browse to `/?contract=<account id>` for any road, with `&rpc=<url>` and `&network=mainnet|testnet` to point it elsewhere. The default road, `longcon3-game.testnet`, comes from `web/public/config.json`. Each panel prints the block height and time it was read at. The playable client is `web/game.html`; `(cd web && bun test ./test)` covers the page's rendering.
 
 ## How it works
 
@@ -64,9 +62,9 @@ Open it with `python3 -m http.server 8080 --directory web` and browse to `/`, or
 | Clamp | `on_terms()` | Advance is cut to bond plus earned line, 15 gold per merchant per due day, 30 percent of the merchant's capital, and the traveler's ask. Interest is held between 0 and 50 percent. Quotes keep every buy price below every sell price, so no grain round trip makes gold. |
 | Default | `advance_day()` | An unpaid debt defaults: the bond burns, the credit line it was lent against is taken back, the merchant books the loss, and a structured con record (class, town, day, amount, request and response hashes, merchant configuration hash) is written. Records hold no free text. |
 | Caravan | `news_at()` | A record reaches a town one game day per town of distance, enters that merchant's prompt, and expires after 8 days. |
-| Rumour | `mt_transfer()` | Each landed con mints a NEP-245 rumour token to the con artist. The first landing of a class takes its place on the Wanted board. |
+| Rumour | `mt_transfer()` | Each landed con mints a NEP-245 style rumour token balance to the con artist. Balances, transfers and events are on chain. The first landing of a class takes its place on the Wanted board. |
 
-Players hold a browser key as a NEAR implicit account. A relayer pays gas through NEP-366 delegate actions and fronts the 0.2 NEAR storage stake each join carries (`sponsor_join`), so there is no wallet popup. Each account has an allowance of 24 offers and a settled offer drops its pitch text, because its request hash already binds it, so contract storage is paid for by the stake.
+Players hold a browser key as a NEAR implicit account. A relayer pays gas through NEP-366 delegate actions and fronts the 0.2 NEAR storage stake each join carries (`sponsor_join`), so there is no wallet popup. Each account has an allowance of 24 offers and a settled offer drops its pitch text. The contract puts at most four recent arrived records in a merchant's prompt.
 
 ## Evidence
 
@@ -80,7 +78,7 @@ Long Con's merchants face the failure modes measured in agent marketplaces: adve
 
 ## Disclosure
 
-The team also enters Voucher, Overdraft and Receipts. Long Con shares no TEE, DCAP, Trezu or function-call-key code with them. All code in this repository was written inside the hackathon window. Libraries: near-sdk, near-workspaces, near-api-js, vite, bun, proptest, ed25519-dalek.
+The team also enters Voucher, Overdraft and Receipts. Long Con shares no TEE, DCAP, Trezu or function-call-key code with them. All code in this repository was written inside the hackathon window. Libraries: near-sdk, near-workspaces, near-api-js, @phala/dcap-qvl, borsh, hex, @fontsource-variable/archivo, vite, bun, proptest and ed25519-dalek.
 
 ## Layout
 

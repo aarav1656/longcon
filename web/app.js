@@ -115,7 +115,7 @@ function renderMerchants(el, state, readAt) {
   }).join('') + '<p class="readat">Read at block ' + esc(readAt.blockHeight) + ', ' + esc(readAt.timestamp) + '</p>';
 }
 
-function renderSigners(el, state, readAt) {
+function renderSigners(el, state, readAt, attestation) {
   const signers = state && Array.isArray(state.signers) ? state.signers : [];
   if (signers.length === 0) {
     el.innerHTML = '<p class="empty">No signing key is registered on this road, so the contract accepts no merchant answer yet. <code>scripts/register-signer.sh</code> registers the key for the road\'s model.</p><p class="readat">Read at block ' + esc(readAt.blockHeight) + ', ' + esc(readAt.timestamp) + '</p>';
@@ -123,13 +123,15 @@ function renderSigners(el, state, readAt) {
   }
   el.innerHTML = '<p>A merchant\'s answer settles an offer only when its ed25519 signature verifies over <code>model:sha256(request):sha256(response)</code> against one of these keys. The request is built by the contract.</p>' +
     '<dl class="kv stack">' + signers.map(function (kv) {
-      return '<dt>' + esc(kv[0]) + (kv[0] === state.model ? ' (the road\'s model)' : '') + '</dt><dd class="num key">' + esc(kv[1]) + '</dd>';
+      const expected = kv[0] === 'gateway' ? attestation && attestation.gateway_signing_key : kv[0] === state.model ? attestation && attestation.model_signing_key : null;
+      const status = !attestation ? 'no attestation report is published for this road' : expected && expected === kv[1] ? 'matches the published attestation report' : 'does not match the published attestation report';
+      return '<dt>' + esc(kv[0]) + (kv[0] === state.model ? ' (the road\'s model)' : '') + '</dt><dd class="num key">' + esc(kv[1]) + '<br><span class="fine">' + esc(status) + '</span></dd>';
     }).join('') + '</dl><p class="readat">Read at block ' + esc(readAt.blockHeight) + ', ' + esc(readAt.timestamp) + '</p>';
 }
 
 function renderRecords(el, records, towns, readAt) {
   if (!Array.isArray(records) || records.length === 0) {
-    el.innerHTML = '<p class="empty">No con has landed on this road. One lands when a traveler repays a small advance, borrows again on that earned credit, and lets the second debt run past due. Open <code>?contract=longcon2-game.testnet</code> to read a road where cons have landed.</p><p class="readat">Read at block ' + esc(readAt.blockHeight) + ', ' + esc(readAt.timestamp) + '</p>';
+    el.innerHTML = '<p class="empty">No con has landed on this road yet. An unpaid advance appears here after its due day ends.</p><p class="readat">Read at block ' + esc(readAt.blockHeight) + ', ' + esc(readAt.timestamp) + '</p>';
     return;
   }
   el.innerHTML = records.map(function (r) {
@@ -156,6 +158,8 @@ async function main() {
   const network = cfg.network || 'mainnet';
   const rpcUrl = cfg.rpc || defaultRpc(network);
   const explorer = cfg.explorer || defaultExplorer(network);
+  let attestation = null;
+  try { const r = await fetch('/attestation.json', { cache: 'no-store' }); if (r.ok) attestation = await r.json(); } catch (e) { attestation = null; }
 
   if (!contractId) {
     const msg = 'No contract id configured.';
@@ -183,7 +187,7 @@ async function main() {
     st = await callFunction(contractId, 'state', {}, rpcUrl);
     readAt.blockHeight = st.blockHeight || readAt.blockHeight;
     renderMerchants(merchantsEl, st.value, readAt);
-    renderSigners(document.getElementById('signers'), st.value, readAt);
+    renderSigners(document.getElementById('signers'), st.value, readAt, attestation);
   } catch (e) {
     showError(document.getElementById('signers'), 'Could not read signers: ' + (e && e.message ? e.message : String(e)));
     showError(merchantsEl, 'Could not read merchants: ' + (e && e.message ? e.message : String(e)), 'Check the contract id and RPC URL, or run the local road: PREFIX=mygame scripts/testnet-up.sh');

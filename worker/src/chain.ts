@@ -38,5 +38,5 @@ export function account(idKey: string, keyKey: string): Account {
   return new Account(env(idKey), provider(), KeyPairSigner.fromSecretKey(env(keyKey) as any));
 }
 
-export const view = <T = any>(p: JsonRpcProvider, contractId: string, method: string, args: object = {}): Promise<T> =>
+export const view = <T = any>(p: JsonRpcProvider, contractId: string, method: string, args: Record<string, unknown> = {}): Promise<T> =>
   p.callFunction({ contractId, method, args }) as Promise<T>;

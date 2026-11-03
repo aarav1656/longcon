@@ -1,5 +1,6 @@
-import { SCHEMA, actions as A } from 'near-api-js';
+import { SCHEMA, PublicKey, actions as A, encodeDelegateAction } from 'near-api-js';
 import { deserialize } from 'borsh';
+import { createHash } from 'node:crypto';
 
 export const ALLOWED = new Set(['join', 'offer', 'trade', 'repay_debt', 'advance_day']);
 export const MAX_GAS = 200_000_000_000_000n;
@@ -30,6 +31,9 @@ export function vet(bytes: Uint8Array, contractId: string): Checked {
   const key = da.publicKey.ed25519Key?.data;
   if (!key) throw new Error('only ed25519 keys');
   if (da.senderId !== hex(key)) throw new Error('sender must be the implicit account of the signing key');
+  const hash = createHash('sha256').update(encodeDelegateAction(da)).digest();
+  const signature = d.signature.ed25519Signature?.data;
+  if (!signature || !PublicKey.from(da.publicKey).verify(hash, Uint8Array.from(signature))) throw new Error('delegate signature does not verify');
   return { senderId: da.senderId, method: fc.methodName, signed: d };
 }
 
@@ -48,5 +52,26 @@ export function joinBudget(max: number, windowMs = 86_400_000) {
     if (times.length >= max) return false;
     times.push(now);
     return true;
+  };
+}
+
+export function clientKey(xff: string | null, socketIp: string | null, trustProxy: boolean): string {
+  return trustProxy ? (xff?.split(',').at(-1)?.trim() || socketIp || 'unknown') : socketIp ?? 'unknown';
+}
+
+export function budgets(perClient: number, global: number, windowMs: number) {
+  const clients = new Map<string, number[]>();
+  const all: number[] = [];
+  return {
+    take(key: string, now = Date.now()): boolean {
+      while (all.length && now - all[0] >= windowMs) all.shift();
+      const times = clients.get(key) ?? [];
+      while (times.length && now - times[0] >= windowMs) times.shift();
+      if (times.length >= perClient || all.length >= global) return false;
+      times.push(now);
+      all.push(now);
+      clients.set(key, times);
+      return true;
+    },
   };
 }

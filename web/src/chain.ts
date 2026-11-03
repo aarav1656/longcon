@@ -49,7 +49,17 @@ export class Chain {
   }
 
   view<T = any>(method: string, args: Record<string, unknown> = {}): Promise<T> {
-    return this.provider.callFunction({ contractId: this.cfg.contract_id, method, args }) as Promise<T>;
+    const pauses = [1000, 2000, 4000, 8000];
+    const read = () => this.provider.callFunction({ contractId: this.cfg.contract_id, method, args }) as Promise<T>;
+    return (async () => {
+      for (let attempt = 0; ; attempt++) {
+        try { return await read(); }
+        catch (e) {
+          if (!/429/.test(String(e)) || attempt === pauses.length) throw e;
+          await new Promise((resolve) => setTimeout(resolve, pauses[attempt]));
+        }
+      }
+    })();
   }
 
   async accountExists(): Promise<boolean> {

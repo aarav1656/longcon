@@ -4,18 +4,20 @@
 
 Command: `cargo test --workspace --no-fail-fast` (the sandbox binaries build the real wasm with `scripts/build-wasm.sh` and run it through real receipts in near-workspaces).
 
-| Binary | Passed |
+| Binary | Async sandbox tests |
 |---|---|
-| unit (`contract`) | 23 |
+| unit (`contract`) | 25 |
 | attestation | 7 |
-| batch | 11 |
+| batch | 13 |
 | clamps | 11 |
-| guards | 6 |
+| guards | 7 |
 | hardening | 6 |
-| lifecycle | 6 |
+| lifecycle | 7 |
 | rumours | 2 |
 | sybil | 2 |
-| total | 74 passed, 0 failed |
+| total | 80 tests |
+
+Sandbox test counts are from `grep -c '#[tokio::test]' tests/tests/*.rs`; contract unit test count is from `cargo test -p longcon --lib -- --list`.
 
 Client tests: `(cd worker && bun test ./test) && (cd web && bun test ./test)`.
 
@@ -80,7 +82,7 @@ Command: `python3 scripts/mutate.py` (one row: `python3 scripts/mutate.py M25`).
 
 ## Signer path checks (client side)
 
-Command: `(cd worker && bun test ./test/nearai.test.ts ./test/attest-check.test.ts ./test/delegate.test.ts ./test/worker-mode.test.ts)`. S04 to S10 use a stub for the Intel quote verifier (a test fixture under `worker/test`); registration itself calls `@phala/dcap-qvl`. Shapes follow the NEAR AI Cloud response-signature and model-attestation pages. Each guard was broken in the source, the named test went red, the file was restored, and the suite went green (26 pass, 0 fail across the worker folder).
+Command: `(cd worker && bun test ./test/nearai.test.ts ./test/attest-check.test.ts ./test/delegate.test.ts ./test/worker-mode.test.ts)`. S04 to S10 exercise Intel quote-verifier inputs with a test fixture under `worker/test`; registration calls `@phala/dcap-qvl` on the fetched report. Shapes follow the NEAR AI Cloud response-signature and model-attestation pages. Each guard was broken in the source, the named test went red, the file was restored, and the suite went green (26 pass, 0 fail across the worker folder).
 
 | Id | Guard broken | File | Test that must go red | Red run | Result |
 |---|---|---|---|---|---|
@@ -98,6 +100,18 @@ Command: `(cd worker && bun test ./test/nearai.test.ts ./test/attest-check.test.
 | S12 | the relayer fronts at most its daily join budget | `worker/src/delegate.ts` | `the join budget stops at its maximum and frees a slot when the window passes` | `(fail) the join budget stops at its maximum and frees a slot when the window passes` | KILLED |
 | S13 | an operator key signs as kind worker | `worker/src/llm.ts` | `an operator key signs as kind worker, never as the model TEE` | `(fail) an operator key signs as kind worker, never as the model TEE` | KILLED |
 | W01 | a JSON-RPC `-429` body is retried by the demo page | `web/app.js` | `rpcCall asks again after a 429 and after a JSON-RPC -429 body, then returns the result` (`cd web && bun test ./test`) | `(fail) rpcCall asks again after a 429 and after a JSON-RPC -429 body, then returns the result` / `12 pass` `1 fail` with `j.error.code === -4290` | `13 pass` `0 fail` after restore | KILLED |
+
+## Wave 5 focused mutation checks
+
+The following focused mutations complement the sandbox rows above.
+
+| Id | Guard broken | File | Test that must go red | Red run | Green after restore | Result |
+|---|---|---|---|---|---|---|
+| W05 | The configuration hash includes `enable_thinking=false` | `contract/src/prompt.rs` | `cargo test -p longcon --lib prompt::tests::config_hash_pins_thinking_off` | Expected hash mismatch after removing the setting | `1 passed, 0 failed` after restore | KILLED |
+| W08 | The request body sends `chat_template_kwargs.enable_thinking=false` | `contract/src/prompt.rs` | `cargo test -p longcon --lib the_batch_body_carries_every_pitch_as_data_and_the_news_in_a_fixed_order` | Assertion `v["chat_template_kwargs"]["enable_thinking"] == false` failed when the request field was removed | `1 passed, 0 failed` after restore | KILLED |
+| W06 | The relayer verifies the NEP-461 delegate signature | `worker/src/delegate.ts` | `cd worker && bun test ./test/delegate.test.ts --test-name-pattern 'flipped signature byte'` | Test did not throw after bypassing verification | `1 pass, 0 fail` after restore | KILLED |
+| W07 | Trusted proxy client identity uses the right-most forwarded address | `worker/src/delegate.ts` | `cd worker && bun test ./test/delegate.test.ts --test-name-pattern 'clientKey uses'` | Expected `203.0.113.4`, received the left-most `10.0.0.1` | `1 pass, 0 fail` after restore | KILLED |
+| W09 | Relayer join spending has a shared daily cap | `worker/src/delegate.ts` | `budgets enforce per-client and shared limits without charging a rejected take` | 121 accepted after removing the global cap | 120 accepted after restoring it | KILLED |
 | W02 | the verdict line prints seconds only for a turn the page watched | `web/src/words.ts` | `the answered line states seconds with one decimal under ten and is empty when the turn was not watched` (`cd web && bun test ./test`) | `(fail) the answered line states seconds with one decimal under ten and is empty when the turn was not watched` / `16 pass` `1 fail` with the zero guard weakened to `ms < 0` | `17 pass` `0 fail` after restore | KILLED |
 | W03 | a pitch transaction link has one slash between explorer and hash | `web/src/words.ts` | `txUrl joins the explorer and the hash without doubling the slash` (`cd web && bun test ./test`) | `(fail) txUrl joins the explorer and the hash without doubling the slash` / `16 pass` `1 fail` with the trailing slash strip removed | `17 pass` `0 fail` after restore | KILLED |
 | W04 | a road with no registered signer says the contract accepts no answer | `web/app.js` | `with no registered key the signer panel says the contract accepts no answer` (`cd web && bun test ./test`) | `(fail) with no registered key the signer panel says the contract accepts no answer` / `16 pass` `1 fail` with the empty branch disabled | `17 pass` `0 fail` after restore | KILLED |

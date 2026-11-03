@@ -276,8 +276,8 @@ impl Contract {
                 block: env::block_height(),
                 status: OfferStatus::Pending,
                 batch: None,
-                request_hash: String::new(),
-                config_hash: String::new(),
+                request_hash: Hash32::default(),
+                config_hash: Hash32::default(),
                 outcome: None,
             },
         );
@@ -348,8 +348,8 @@ impl Contract {
         for id in &ids {
             let o = self.offers.get_mut(id).unwrap_or_else(|| env::panic_str("queued offer missing"));
             o.batch = Some(batch_id);
-            o.request_hash = request_hash.clone();
-            o.config_hash = config_hash.clone();
+            o.request_hash = Hash32::from_hex(&request_hash);
+            o.config_hash = Hash32::from_hex(&config_hash);
         }
         self.batches.insert(
             batch_id,
@@ -361,10 +361,10 @@ impl Contract {
                 block: env::block_height(),
                 status: BatchStatus::Open,
                 request_body: body.clone(),
-                request_hash: request_hash.clone(),
-                config_hash,
+                request_hash: Hash32::from_hex(&request_hash),
+                config_hash: Hash32::from_hex(&config_hash),
                 signature: String::new(),
-                response_hash: String::new(),
+                response_hash: Hash32::default(),
             },
         );
         self.open_batches.insert(batch_id);
@@ -394,7 +394,7 @@ impl Contract {
             .unwrap_or_else(|| env::panic_str("no signer registered for this signature kind"));
         let sig = attest::decode_sig(&signature).unwrap_or_else(|| env::panic_str("signature must be 64 bytes of hex"));
         let response_hash = attest::sha256_hex(&response);
-        let text = attest::signed_text(kind, &self.model, &batch.request_hash, &response_hash);
+        let text = attest::signed_text(kind, &self.model, &batch.request_hash.to_hex(), &response_hash);
         require!(attest::verify(&sig, &text, &key), "signature does not verify over the request this contract built and the response given");
 
         let terms = attest::parse_batch(&response, batch.offer_ids.len());
@@ -418,7 +418,7 @@ impl Contract {
         b.status = BatchStatus::Resolved;
         b.request_body = String::new();
         b.signature = signature;
-        b.response_hash = response_hash.clone();
+        b.response_hash = Hash32::from_hex(&response_hash);
         self.open_batches.remove(&batch_id);
         emit("batch_resumed", json!({"batch_id": batch_id, "response_hash": response_hash}));
     }
@@ -462,6 +462,13 @@ impl Contract {
         self.pending.remove(&offer_id);
         self.queues[offer.merchant as usize].retain(|x| *x != offer_id);
         self.close_batch_if_settled(batch);
+        let expired = {
+            let p = self.players.get_mut(&offer.player).unwrap_or_else(|| env::panic_str("player vanished"));
+            (p.offer_ids.len() > 6).then(|| p.offer_ids.remove(0))
+        };
+        if let Some(id) = expired {
+            self.offers.remove(&id);
+        }
         emit(
             "offer_settled",
             json!({"offer_id": offer_id, "status": outcome.status, "advance": outcome.advance, "clamps": outcome.clamps}),
@@ -472,7 +479,7 @@ impl Contract {
     /// Repay a debt on or before its due day: principal plus interest, bond returned, credit line grows.
     pub fn repay_debt(&mut self, debt_id: u64) {
         let who = env::predecessor_account_id();
-        let d = self.debts.get_mut(&debt_id).unwrap_or_else(|| env::panic_str("no such debt"));
+        let d = self.debts.get_mut(&debt_id).unwrap_or_else(|| env::panic_str("debt is not open"));
         require!(d.player == who, "this is not your debt");
         require!(d.status == DebtStatus::Open, "debt is not open");
         require!(self.day <= d.due_day, "debt is past due");
@@ -489,8 +496,17 @@ impl Contract {
         let key = (d.merchant, d.due_day);
         let due = self.due_exposure.get(&key).copied().unwrap_or(0);
         self.due_exposure.insert(key, due.saturating_sub(d.principal));
-        d.status = DebtStatus::Repaid;
+        let due_day = d.due_day;
+        if let Some(mut ids) = self.due_index.get(&due_day).cloned() {
+            ids.retain(|id| *id != debt_id);
+            if ids.is_empty() {
+                self.due_index.remove(&due_day);
+            } else {
+                self.due_index.insert(due_day, ids);
+            }
+        }
         emit("debt_repaid", json!({"debt_id": debt_id, "player": who}));
+        self.debts.remove(&debt_id);
     }
 
     /// End the game day. Debts due today default: the bond burns, the merchant books the loss, and
@@ -507,7 +523,7 @@ impl Contract {
         self.day += 1;
         self.day_started_ns = now;
         for id in self.due_index.remove(&old).unwrap_or_default() {
-            let d = self.debts.get_mut(&id).unwrap_or_else(|| env::panic_str("indexed debt missing"));
+            let Some(d) = self.debts.get_mut(&id) else { continue };
             if d.status != DebtStatus::Open {
                 continue;
             }
@@ -536,13 +552,14 @@ impl Contract {
                 loss: d.principal,
                 debt_id: id,
                 model: d.model.clone(),
-                request_hash: d.request_hash.clone(),
-                response_hash: d.response_hash.clone(),
-                config_hash: d.config_hash.clone(),
+                request_hash: d.request_hash,
+                response_hash: d.response_hash,
+                config_hash: d.config_hash,
             };
             emit("con_landed", json!({"record_id": rec.id, "class": rec.class, "town": rec.town, "loss": rec.loss}));
             self.mint_rumour(&rec);
             self.records.push(rec);
+            self.debts.remove(&id);
         }
         emit("day_advanced", json!({"day": self.day}));
     }
@@ -870,9 +887,9 @@ impl Contract {
                 status: DebtStatus::Open,
                 class: prop.class,
                 model: r.model,
-                request_hash: offer.request_hash.clone(),
-                response_hash: r.response_hash,
-                config_hash: offer.config_hash.clone(),
+                request_hash: offer.request_hash,
+                response_hash: Hash32::from_hex(&r.response_hash),
+                config_hash: offer.config_hash,
             },
         );
         out.status = OfferStatus::Committed;
@@ -957,7 +974,7 @@ pub struct BatchView {
 
 impl From<&Batch> for BatchView {
     fn from(b: &Batch) -> Self {
-        Self { id: b.id, merchant: b.merchant, offer_ids: b.offer_ids.clone(), request_hash: b.request_hash.clone(), block: b.block, signature: b.signature.clone(), response_hash: b.response_hash.clone() }
+        Self { id: b.id, merchant: b.merchant, offer_ids: b.offer_ids.clone(), request_hash: b.request_hash.to_hex(), block: b.block, signature: b.signature.clone(), response_hash: b.response_hash.to_hex() }
     }
 }
 

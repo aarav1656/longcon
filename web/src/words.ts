@@ -1,3 +1,5 @@
+import { PublicKey, baseEncode } from 'near-api-js';
+
 /** Plain-English wording for contract enums. Pure, so it is tested without a browser. */
 
 export const CLASS_LABEL: Record<string, string> = {
@@ -62,10 +64,49 @@ export interface PitchCheck {
 export function checkPitch(pitch: string, ask: number, bond: number, gold: number, maxAsk: number, maxBytes = 400): PitchCheck {
   if (!pitch.trim()) return { ok: false, why: 'Write a pitch first.' };
   if (byteLen(pitch) > maxBytes) return { ok: false, why: `The pitch is over ${maxBytes} bytes.` };
+  if (Array.from(pitch).some((c) => c.codePointAt(0)! < 0x20 && c !== '\n')) return { ok: false, why: 'Remove control characters from the pitch.' };
   if (!Number.isInteger(ask) || ask < 1 || ask > maxAsk) return { ok: false, why: `Ask for between 1 and ${maxAsk} gold.` };
   if (!Number.isInteger(bond) || bond < 0) return { ok: false, why: 'The bond is a whole number of gold.' };
   if (bond > gold) return { ok: false, why: `You hold ${gold} gold, so you cannot bond ${bond}.` };
   return { ok: true, why: '' };
+}
+
+export async function sha256Hex(s: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function newsLines(body: string): string[] {
+  try {
+    const content = JSON.parse(body)?.messages?.[1]?.content;
+    if (typeof content !== 'string') return [];
+    const lines = content.split('\n');
+    const start = lines.findIndex((line) => line.includes('News that has reached your town:'));
+    if (start < 0) return [];
+    const end = lines.findIndex((line, i) => i > start && line.endsWith('traveler(s) are waiting.'));
+    return lines.slice(start + 1, end < 0 ? undefined : end).filter((line) => line.startsWith('- day '));
+  } catch {
+    return [];
+  }
+}
+
+export function signedText(kind: string, model: string, reqHash: string, respHash: string): string {
+  return kind === 'gateway' ? `${reqHash}:${respHash}` : `${model}:${reqHash}:${respHash}`;
+}
+
+export function signatureValid(kind: string, model: string, reqHash: string, respHash: string, sigHex: string, keyHex: string): boolean {
+  try {
+    const hexBytes = (value: string) => {
+      const clean = value.replace(/^0x/, '');
+      if (!/^(?:[0-9a-f]{2})+$/i.test(clean)) throw new Error('invalid hex');
+      return Uint8Array.from(clean.match(/.{2}/g)!, (b) => parseInt(b, 16));
+    };
+    return PublicKey.fromString(`ed25519:${baseEncode(hexBytes(keyHex))}`).verify(
+      new TextEncoder().encode(signedText(kind, model, reqHash, respHash)), hexBytes(sigHex),
+    );
+  } catch {
+    return false;
+  }
 }
 
 export interface Move {

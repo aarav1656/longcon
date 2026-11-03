@@ -1,4 +1,57 @@
+use near_sdk::serde::{Deserialize, Deserializer, Serialize, Serializer};
 use near_sdk::{near, AccountId};
+
+#[near(serializers = [borsh])]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+pub struct Hash32(Option<[u8; 32]>);
+
+impl Hash32 {
+    pub fn from_hex(value: &str) -> Self {
+        let bytes =
+            hex::decode(value).unwrap_or_else(|_| near_sdk::env::panic_str("invalid sha256 hex"));
+        Self(Some(
+            bytes
+                .try_into()
+                .unwrap_or_else(|_| near_sdk::env::panic_str("invalid sha256 length")),
+        ))
+    }
+    pub fn to_hex(self) -> String {
+        self.0.map(hex::encode).unwrap_or_default()
+    }
+}
+
+impl Serialize for Hash32 {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.0.map(hex::encode).unwrap_or_default())
+    }
+}
+
+impl<'de> Deserialize<'de> for Hash32 {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = String::deserialize(deserializer)?;
+        let bytes = hex::decode(value).map_err(near_sdk::serde::de::Error::custom)?;
+        bytes
+            .try_into()
+            .map(|bytes| Self(Some(bytes)))
+            .map_err(|_| near_sdk::serde::de::Error::custom("invalid sha256 length"))
+    }
+}
+
+#[cfg(test)]
+mod hash_tests {
+    use super::Hash32;
+
+    #[test]
+    fn persisted_hashes_use_compact_borsh_and_stable_hex_json() {
+        let hash = Hash32::from_hex(&"ab".repeat(32));
+        assert_eq!(near_sdk::borsh::to_vec(&hash).unwrap().len(), 33);
+        assert_eq!(near_sdk::serde_json::to_string(&hash).unwrap(), format!("\"{}\"", "ab".repeat(32)));
+        let decoded: Hash32 = near_sdk::serde_json::from_str(&format!("\"{}\"", "ab".repeat(32))).unwrap();
+        assert_eq!(decoded.to_hex(), "ab".repeat(32));
+        assert_eq!(near_sdk::serde_json::to_string(&Hash32::default()).unwrap(), "\"\"");
+        assert!(near_sdk::serde_json::from_str::<Hash32>("\"ab\"").is_err());
+    }
+}
 
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -133,9 +186,9 @@ pub struct Offer {
     /// The batch this offer was sealed into; `None` while it waits in the merchant's queue.
     pub batch: Option<u64>,
     /// Hash of the batch request the merchant answered. Empty until sealed.
-    pub request_hash: String,
+    pub request_hash: Hash32,
     /// sha256 of model, temperature and system prompt: the merchant's pinned configuration.
-    pub config_hash: String,
+    pub config_hash: Hash32,
     pub outcome: Option<Outcome>,
 }
 
@@ -160,10 +213,10 @@ pub struct Batch {
     pub block: u64,
     pub status: BatchStatus,
     pub request_body: String,
-    pub request_hash: String,
-    pub config_hash: String,
+    pub request_hash: Hash32,
+    pub config_hash: Hash32,
     pub signature: String,
-    pub response_hash: String,
+    pub response_hash: Hash32,
 }
 
 #[near(serializers = [json, borsh])]
@@ -181,9 +234,9 @@ pub struct Debt {
     pub status: DebtStatus,
     pub class: ConClass,
     pub model: String,
-    pub request_hash: String,
-    pub response_hash: String,
-    pub config_hash: String,
+    pub request_hash: Hash32,
+    pub response_hash: Hash32,
+    pub config_hash: Hash32,
 }
 
 /// A landed con: a debt that defaulted. Merchants read these, delayed by caravan distance.
@@ -201,9 +254,9 @@ pub struct ConRecord {
     pub loss: u64,
     pub debt_id: u64,
     pub model: String,
-    pub request_hash: String,
-    pub response_hash: String,
-    pub config_hash: String,
+    pub request_hash: Hash32,
+    pub response_hash: Hash32,
+    pub config_hash: Hash32,
 }
 
 #[near(serializers = [json, borsh])]

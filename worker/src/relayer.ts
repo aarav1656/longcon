@@ -1,5 +1,5 @@
 import { account, env, provider, view } from './chain.ts';
-import { callFor, joinBudget, toAction, vet } from './delegate.ts';
+import { budgets, callFor, clientKey, toAction, vet } from './delegate.ts';
 import { sleep } from './lib.ts';
 import { parseNearAmount } from 'near-api-js';
 
@@ -12,7 +12,8 @@ const ORIGIN = process.env.RELAYER_ORIGIN ?? '*';
 const PER_MINUTE = Number(process.env.RELAYER_PER_MINUTE ?? 30);
 
 const JOIN_DEPOSIT = BigInt(process.env.JOIN_DEPOSIT_YOCTO ?? '200000000000000000000000'); // 0.2 NEAR, the storage stake the contract requires on join
-const mayJoin = joinBudget(Number(process.env.RELAYER_JOINS_PER_DAY ?? 50));
+const activationBudget = budgets(Number(process.env.ACTIVATE_PER_CLIENT_HOUR ?? 3), Number(process.env.ACTIVATE_GLOBAL_HOUR ?? 120), 3_600_000);
+const joinBudget = budgets(Number(process.env.JOIN_PER_CLIENT_DAY ?? 3), Number(process.env.RELAYER_JOINS_PER_DAY ?? 100), 86_400_000);
 
 const hits = new Map<string, number[]>();
 function limited(who: string): boolean {
@@ -65,10 +66,10 @@ async function early(txHash: string, sender: string): Promise<{ ok: boolean; err
 
 Bun.serve({
   port: PORT,
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
-    const who = req.headers.get('x-forwarded-for') ?? 'local';
+    const who = clientKey(req.headers.get('x-forwarded-for'), server.requestIP(req)?.address ?? null, process.env.TRUST_PROXY === '1');
     try {
       if (url.pathname === '/health') return json({ ok: true, contract: contractId, relayer: relayer.accountId });
       if (limited(who)) return json({ error: 'slow down' }, 429);
@@ -76,6 +77,7 @@ Bun.serve({
         const { account_id } = (await req.json()) as { account_id: string };
         if (!/^[0-9a-f]{64}$/.test(account_id)) return json({ error: 'activate takes a 64 hex implicit account' }, 400);
         if (await exists(account_id)) return json({ ok: true, created: false });
+        if (!activationBudget.take(who)) return json({ error: 'activation limit reached for now' }, 429);
         await relayer.transfer({ receiverId: account_id, amount: ACTIVATION });
         return json({ ok: true, created: true });
       }
@@ -84,7 +86,7 @@ Bun.serve({
         const checked = vet(Buffer.from(signed_delegate, 'base64'), contractId);
         const call = callFor(checked);
         if (call.kind === 'sponsor_join') {
-          if (!mayJoin()) return json({ error: 'the road has taken its travelers for today, try again tomorrow' }, 429);
+          if (!joinBudget.take(who)) return json({ error: 'join limit reached for now' }, 429);
           const res: any = await relayer.callFunction({ contractId, methodName: 'sponsor_join', args: call.args, gas: 30_000_000_000_000n, deposit: JOIN_DEPOSIT });
           const tx = res?.transaction?.hash ?? res?.transaction_outcome?.id ?? res?.transactionOutcome?.id;
           return json({ ok: true, method: 'join', tx });

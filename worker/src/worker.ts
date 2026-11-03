@@ -20,7 +20,9 @@ const RESUME_MARGIN_BLOCKS = 25;
 const BATCH_WINDOW_BLOCKS = Number(process.env.BATCH_WINDOW_BLOCKS ?? 6);
 const MAX_BATCH = 8;
 const inflight = new Set<number>();
+const handled = new Set<number>();
 const sealing = new Set<number>();
+let signatureFailures = 0;
 
 function log(o: object) {
   const line = JSON.stringify({ t: new Date().toISOString(), ...o });
@@ -55,15 +57,25 @@ async function handle(b: BatchView, head: number, oldestOffer: number) {
   const deadline = t0 + Math.max(10_000, blocksLeft * 575);
   const body: string = await view(p, contractId, 'batch_body', { batch_id: b.id });
   if (sha256Hex(body) !== b.request_hash) throw new Error('request body does not hash to the request_hash on chain');
-  const a = await answer(cfg, body, b.offer_ids.length, deadline);
+  const a = await answer(cfg, body, b.offer_ids.length, deadline, (chatId, status) => log({ ev: 'attempt', batch: b.id, chat_id: chatId, status }));
   const t1 = Date.now();
-  const res = await acc.callFunction({
-    contractId,
-    methodName: 'npc_resume_batch',
-    args: { batch_id: b.id, response: a.response, signature: a.signature, kind: a.kind },
-    gas: 300_000_000_000_000n,
-    deposit: 0n,
-  });
+  let res;
+  try {
+    res = await acc.callFunction({
+      contractId,
+      methodName: 'npc_resume_batch',
+      args: { batch_id: b.id, response: a.response, signature: a.signature, kind: a.kind },
+      gas: 300_000_000_000_000n,
+      deposit: 0n,
+    });
+    signatureFailures = 0;
+  } catch (e: any) {
+    if (/signature does not verify/.test(String(e?.message ?? e)) && ++signatureFailures >= 3) {
+      log({ ev: 'alert', what: 'signer_mismatch' });
+      signatureFailures = 0;
+    }
+    throw e;
+  }
   log({ ev: 'resumed', batch: b.id, offers: b.offer_ids.length, kind: a.kind, llm_ms: a.llmMs, sig_ms: a.sigMs, resume_tx_ms: Date.now() - t1, total_ms: Date.now() - t0, attempts: a.attempts, tx: (res as any)?.transaction?.hash });
 }
 
@@ -82,7 +94,8 @@ async function tick() {
   const batches = sealed ? await view<BatchView[]>(p, contractId, 'open_batches') : listed;
   const offers = sealed ? await view<Pending[]>(p, contractId, 'pending_offers') : pending;
   for (const b of batches) {
-    if (inflight.has(b.id)) continue;
+    if (handled.has(b.id) || inflight.has(b.id)) continue;
+    handled.add(b.id);
     inflight.add(b.id);
     const oldest = Math.min(...offers.filter((o) => o.batch === b.id).map((o) => o.block), b.block);
     handle(b, head, oldest)

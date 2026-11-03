@@ -16,8 +16,8 @@ const towns = ['Millford', 'Pellgate', 'Oskmoor'];
 test('an empty ledger says how a con lands and where to read one that has', () => {
   const e = el();
   lib.renderRecords(e, [], towns, readAt);
-  expect(e.innerHTML).toContain('repays a small advance');
-  expect(e.innerHTML).toContain('?contract=longcon2-game.testnet');
+  expect(e.innerHTML).toContain('An unpaid advance appears here after its due day ends.');
+  expect(e.innerHTML).not.toContain('?contract=longcon2-game.testnet');
   expect(e.innerHTML).toContain('Read at block 275716181');
 });
 
@@ -41,10 +41,21 @@ test('merchants show treasury, loans and the cap they are held to', () => {
   expect(e.innerHTML).toContain('Daily loss cap 15 gold. Treasury cap 30 percent.');
 });
 
-test('the default road in config.json is one that holds con records', () => {
+test('the default road in config.json is the new testnet road', () => {
   const cfg = JSON.parse(readFileSync(new URL('../public/config.json', import.meta.url), 'utf8'));
-  expect(cfg.contract_id).toBe('longcon2-game.testnet');
+  expect(cfg.contract_id).toBe('longcon3-game.testnet');
   expect(cfg.rpc).toStartWith('https://');
+});
+
+test('the ledger page compares the registered model key with its published report', () => {
+  const e = el();
+  const state = { model: 'm', signers: [['m', 'a'.repeat(64)]] };
+  lib.renderSigners(e, state, readAt, { model_signing_key: 'a'.repeat(64) });
+  expect(e.innerHTML).toContain('matches the published attestation report');
+  lib.renderSigners(e, state, readAt, { model_signing_key: 'b'.repeat(64) });
+  expect(e.innerHTML).toContain('does not match the published attestation report');
+  lib.renderSigners(e, state, readAt, null);
+  expect(e.innerHTML).toContain('no attestation report is published for this road');
 });
 
 const reply = (status: number, body: unknown) => ({ ok: status >= 200 && status < 300, status, statusText: 'x', json: async () => body });

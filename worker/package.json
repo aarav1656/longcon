@@ -7,6 +7,7 @@
     "worker": "bun run src/worker.ts",
     "relayer": "bun run src/relayer.ts",
     "register-signer": "bun run src/register-signer.ts",
+    "verify-attestation": "bun run src/verify-attestation.ts",
     "test": "find . -name '._*' -not -path './node_modules/*' -delete; bun test ./test",
     "spike": "bun run src/spike.ts"
   },

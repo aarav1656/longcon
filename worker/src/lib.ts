@@ -79,7 +79,7 @@ const ed25519Hex = (a: any): string | null =>
  * Instances of one model share a single signing key, so several candidates with the same address are fine and several different addresses are refused.
  */
 export function attestedSigners(rep: any): { model: string; gateway: string | null } {
-  const keys = new Set((rep?.model_attestations ?? []).map(ed25519Hex).filter((k: string | null): k is string => !!k));
+  const keys = new Set<string>((rep?.model_attestations ?? []).map(ed25519Hex).filter((k: string | null): k is string => !!k));
   if (keys.size === 0) throw new Error('attestation report has no ed25519 model signer');
   if (keys.size > 1) throw new Error(`attestation report holds ${keys.size} different ed25519 model signers, refusing to pick one`);
   const model = [...keys][0];

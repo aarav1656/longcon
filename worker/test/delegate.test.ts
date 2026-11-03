@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { KeyPair, KeyPairSigner, actions, buildDelegateAction, encodeSignedDelegate } from 'near-api-js';
-import { vet } from '../src/delegate.ts';
+import { budgets, clientKey, vet } from '../src/delegate.ts';
 
 const CONTRACT = 'longcon.testnet';
 
@@ -44,6 +44,25 @@ for (const [name, over, msg] of [
 
 test('rejects bytes that are not a delegate', () => {
   expect(() => vet(new Uint8Array([1, 2, 3]), CONTRACT)).toThrow('not a signed delegate');
+});
+
+test('vet rejects a delegate with one flipped signature byte', async () => {
+  const { bytes } = await make();
+  const altered = new Uint8Array(bytes);
+  altered[altered.length - 1] ^= 1;
+  expect(() => vet(altered, CONTRACT)).toThrow('delegate signature does not verify');
+});
+
+test('clientKey uses the socket unless a trusted proxy is configured', () => {
+  for (let i = 0; i < 20; i++) expect(clientKey(`10.0.0.${i + 1}, 203.0.113.4`, '192.0.2.2', true)).toBe('203.0.113.4');
+  expect(clientKey('10.0.0.1, 203.0.113.4', '192.0.2.2', false)).toBe('192.0.2.2');
+});
+
+test('budgets enforce per-client and shared limits without charging a rejected take', () => {
+  const b = budgets(3, 4, 1000);
+  expect([b.take('a', 0), b.take('a', 1), b.take('a', 2), b.take('a', 3), b.take('b', 4)]).toEqual([true, true, true, false, true]);
+  const global = budgets(3, 120, 1000);
+  expect(Array.from({ length: 121 }, (_, i) => global.take(String(i), i)).filter(Boolean)).toHaveLength(120);
 });
 
 import { callFor, joinBudget } from '../src/delegate.ts';

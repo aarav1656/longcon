@@ -1,0 +1,5 @@
+{
+  "buildCommand": "bun run build && cp index.html dist/ledger.html && cp app.js style.css dist/",
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/", "destination": "/game.html" }]
+}

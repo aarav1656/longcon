@@ -62,7 +62,21 @@ export async function checkNearReport(report: any, nonceHex: string, accepted: s
 export async function verifiedSigners(rep: any, nonceHex: string, accepted: string[], verify: QuoteVerifier = intelVerifier) {
   const candidates: any[] = rep?.model_attestations ?? [];
   if (candidates.length === 0) throw new Error('attestation report has no model evidence');
-  for (const c of candidates) await checkNearReport(c, nonceHex, accepted, verify);
-  if (rep.gateway_attestation) await checkNearReport(rep.gateway_attestation, nonceHex, accepted, verify);
-  return attestedSigners(rep);
+  const model: string[] = [];
+  for (const c of candidates) model.push(await checkNearReport(c, nonceHex, accepted, verify));
+  const gateway = rep.gateway_attestation ? await checkNearReport(rep.gateway_attestation, nonceHex, accepted, verify) : null;
+  return { ...attestedSigners(rep), tcb: { model, gateway } };
+}
+
+export function attestationRecord(report: any, nonceHex: string, signers: Awaited<ReturnType<typeof verifiedSigners>>, fetchedAt: string) {
+  const { model, ...raw } = report;
+  return {
+    model,
+    model_signing_key: signers.model,
+    gateway_signing_key: signers.gateway,
+    request_nonce: nonceHex,
+    fetched_at: fetchedAt,
+    tcb_status: signers.tcb,
+    report: raw,
+  };
 }

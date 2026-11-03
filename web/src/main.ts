@@ -1,6 +1,6 @@
 import './style.css';
 import { Chain, Config, explain, identity, loadConfig } from './chain.ts';
-import { checkPitch, classLabel, classShort, clampSentence, esc, nextMove, newsArrives, shortId, STATUS_LABEL, txUrl, answeredLine } from './words.ts';
+import { checkPitch, classLabel, classShort, clampSentence, esc, nextMove, newsArrives, shortId, STATUS_LABEL, txUrl, answeredLine, newsLines, sha256Hex, signatureValid } from './words.ts';
 
 interface Merchant { id: number; name: string; town: number; gold: number; grain: number; outstanding: number; buy_price: number; sell_price: number; lost_total: number; town_name: string; treasury_room: number; due_exposure: number[] }
 interface Rules { loss_cap_per_day: number; treasury_cap_pct: number; max_due_days: number; max_interest_pct: number; max_ask: number; gold_stipend: number; towns: string[] }
@@ -8,13 +8,14 @@ interface StateV { day: number; day_length_ms: number; day_started_ns: string; m
 interface Debt { id: number; merchant: number; principal: number; repay: number; bond: number; due_day: number; status: string; class: string }
 interface PlayerV { gold: number; grain: number; earned_line: number; locked_bonds: number; outstanding: number; pending_offer: number | null; offers_total: number; cons_landed: number; debts: Debt[] }
 interface Outcome { status: string; proposed_advance: number; proposed_repay: number; advance: number; repay: number; due_day: number; class: string; reason: string; clamps: string[]; debt_id: number | null; model: string; signer: string; response_hash: string }
-interface Offer { id: number; merchant: number; ask: number; bond: number; pitch: string; day: number; status: string; request_hash: string; outcome: Outcome | null }
+interface Offer { id: number; merchant: number; ask: number; bond: number; pitch: string; day: number; status: string; batch: number | null; request_hash: string; outcome: Outcome | null }
+interface BatchV { signature: string; response_hash: string }
 interface Rec { id: number; day: number; town: number; merchant: number; player: string; class: string; principal: number; bond_burned: number; loss: number; request_hash: string; response_hash: string }
 interface Wanted { class: string; record_id: number; first_player: string; day: number; landed: number }
 
 const CLASSES = ['future_cargo', 'borrowed_authority', 'sob_story', 'urgency', 'false_collateral', 'other'];
 const STARTERS = [
-  { label: 'Cargo on its way', ask: 30, bond: 6, text: 'My grain wagons reach the Pellgate gate on day 4. Advance me 30 gold against the load and I repay 33 the morning they roll in.' },
+  { label: 'Seed grain', ask: 4, bond: 5, text: 'I would like to borrow 4 gold until tomorrow to buy seed grain, and I will repay 5 then. My bond is posted.' },
   { label: 'Drop a name', ask: 25, bond: 6, text: 'The toll keeper at Oskmoor vouches for me and said you would stand a short loan. Put 25 gold on his word and he settles it with you himself.' },
   { label: 'Sob story', ask: 20, bond: 5, text: 'My mule died on the Millford road and my children have not eaten since yesterday. Twenty gold gets us through the week, I will pay you back.' },
 ];
@@ -36,6 +37,8 @@ let cfg: Config;
 let st: StateV | null = null;
 let pv: PlayerV | null = null;
 let last: Offer | null = null;
+let lastBatch: BatchV | null = null;
+let attestation: any = null;
 let history: Offer[] = [];
 let records: Rec[] = [];
 let wanted: Wanted[] = [];
@@ -49,6 +52,8 @@ let onboardErr = '';
 let pendingSince = 0;
 let answeredMs = 0;
 const TX_KEY = 'longcon.offer-tx';
+const REQUESTS_KEY = 'longcon.requests';
+const requestCaptures: Record<string, { match?: boolean; missed?: boolean; news?: string[] }> = JSON.parse(localStorage.getItem(REQUESTS_KEY) ?? '{}');
 const offerTx: Record<string, string> = JSON.parse(localStorage.getItem(TX_KEY) ?? '{}');
 let ready = false;
 
@@ -60,10 +65,10 @@ function skeleton() {
       <h1>talk the road out of its gold<span class="sq"></span></h1>
     </section>
     <section class="intro g12">
-      <p class="what">Three merchants on a road of towns lend real gold held in a NEAR contract. Each one is an AI model. You pitch one for an advance. The contract checks the model's signed answer, then clamps the terms to limits no pitch can move. Skip the repayment and the con lands in a public ledger that the next town reads one day later.</p>
+      <p class="what">Three merchants on a road of towns lend real gold held in a NEAR contract. Each one is an AI model. You pitch one for an advance. The contract checks the signed answer, then clamps the terms to limits no pitch can move. Skip the repayment and the con lands in a public ledger that the next town reads one day later.</p>
       <ol class="steps">
         <li><b>Pick a merchant and pitch.</b> See the merchant's own words and exactly what the road let through.</li>
-        <li><b>Take the advance, then end the day twice.</b> See the debt default, your bond burn, and the con enter the ledger.</li>
+        <li><b>Take the advance, end its due day, then one more.</b> See the debt default, your bond burn, and the con enter the ledger.</li>
         <li><b>Pitch the next town.</b> See its merchant carry the news into the answer.</li>
       </ol>
     </section>
@@ -121,17 +126,48 @@ function syncForm() {
   $('#err').textContent = errMsg;
 }
 
+async function captureRequest() {
+  const id = pv?.pending_offer;
+  if (!id || Object.hasOwn(requestCaptures, String(id))) return;
+  const offer = await chain.view<Offer>('offer_by_id', { offer_id: id });
+  if (!offer?.batch) return;
+  try {
+    const body = await chain.view<string>('batch_body', { batch_id: offer.batch });
+    requestCaptures[String(id)] = { match: await sha256Hex(body) === offer.request_hash, news: newsLines(body) };
+    localStorage.setItem(REQUESTS_KEY, JSON.stringify(requestCaptures));
+  } catch (e) {
+    if (!explain(String(e)).includes('batch is settled')) throw e;
+    requestCaptures[String(id)] = { missed: true };
+    localStorage.setItem(REQUESTS_KEY, JSON.stringify(requestCaptures));
+  }
+}
+
 const gold = (n: number) => `<span class="num">${n}</span>`;
+
+function signerSentence(signer: string, model: string): string {
+  if (signer === 'gateway') return 'Answer signed by the NEAR AI Cloud gateway TEE; this signature does not name the model.';
+  if (signer.startsWith('worker:')) return "Answer signed by the operator's worker key, not a TEE.";
+  return signer ? `Answer signed by the ${model} model TEE.` : 'Answer signer not recorded.';
+}
 
 function renderBar() {
   const p = pv;
+  const signer = last?.outcome?.signer || st?.model || '';
+  const kind = signer === 'gateway' ? 'gateway' : signer.startsWith('worker:') ? 'worker' : 'provider_tee';
+  const signerLine = last?.outcome ? signerSentence(signer, last.outcome.model) : '';
+  const registered = Object.fromEntries(st?.signers ?? []);
+  const expectedKey = kind === 'gateway' ? attestation?.gateway_signing_key : attestation?.model_signing_key;
+  const tcb = kind === 'gateway' ? attestation?.tcb_status?.gateway : attestation?.tcb_status?.model?.join(', ');
+  const attestationLine = !attestation ? 'no attestation report is published for this road'
+    : registered[signer] === expectedKey ? `key ${shortId(registered[signer])} matches the published attestation report (fetched ${attestation.fetched_at}, TCB ${tcb})`
+      : 'key does not match the published attestation report';
   put("#bar", `
     <div class="mark"><i></i>long con</div>
     <div class="stat"><span class="label">Road day</span><b>${st?.day ?? '-'}</b></div>
     <div class="stat"><span class="label">Your gold</span><b>${p ? p.gold : '-'}</b></div>
     <div class="stat"><span class="label">Bond locked</span><b>${p ? p.locked_bonds : '-'}</b></div>
     <div class="stat"><span class="label">Credit earned</span><b>${p ? p.earned_line : '-'}</b></div>
-    <div class="who"><span class="label">${esc(cfg.network)} account</span><br><span class="mono" title="${esc(chain.me.id)}">${esc(shortId(chain.me.id, 8, 6))}</span></div>`);
+    <div class="who"><span class="label">${esc(cfg.network)} account</span><br><span class="mono" title="${esc(chain.me.id)}">${esc(shortId(chain.me.id, 8, 6))}</span><p>${esc(signerLine || `Road model: ${signer}`)}. ${esc(attestationLine)}</p></div>`);
 }
 
 function renderRoad() {
@@ -199,11 +235,25 @@ function renderVerdict() {
     return;
   }
   const oc = o.outcome;
+  el.dataset.requestHash = o.request_hash;
+  const signerKind = oc.signer === 'gateway' ? 'gateway' : oc.signer.startsWith('worker:') ? 'worker' : 'provider_tee';
+  const signerKey = Object.fromEntries(st?.signers ?? [])[oc.signer] ?? '';
+  const signatureOk = !!lastBatch && signatureValid(signerKind, oc.model, o.request_hash, lastBatch.response_hash, lastBatch.signature, signerKey);
+  const capture = requestCaptures[String(o.id)];
+  const requestCheck = capture?.match === true ? 'Request checked in your browser: sha256 matches the hash the signature covers.'
+    : capture?.match === false ? 'Request bytes did NOT match the hash on chain.'
+      : capture?.missed ? 'The answer came back before this page read the request.'
+        : Object.hasOwn(requestCaptures, String(o.id)) ? 'Request not captured in this browser.'
+          : 'Request not captured in this browser.';
   const max = Math.max(o.ask, oc.proposed_advance, oc.advance, 1);
   const w = (n: number) => Math.round((n / max) * 100);
   const interest = oc.advance ? oc.repay - oc.advance : 0;
   el.innerHTML = `<h3><span class="mk ${esc(o.status)}"></span>${esc(STATUS_LABEL[o.status] ?? o.status)} (${esc(name(o.merchant))}, day ${o.day})</h3>
     <p class="say"><q>${esc(oc.reason || 'The merchant gave no reason.')}</q></p>
+    <p class="fine">${esc(signerSentence(oc.signer, oc.model))}</p>
+    <p class="fine">${signatureOk ? 'Signature checked in your browser.' : 'Signature did NOT verify against the registered key.'}</p>
+    <p class="fine">${requestCheck}</p>
+    ${capture?.news?.length ? `<div class="fine"><span>News in this request:</span><ul>${capture.news.map((line) => `<li>${esc(line)}</li>`).join('')}</ul></div>` : ''}
     <div class="tri">
       <div class="r"><span class="label">You asked</span><span class="rail"><i style="width:${w(o.ask)}%"></i></span><b>${o.ask}</b></div>
       <div class="r"><span class="label">Merchant offered</span><span class="rail"><i style="width:${w(oc.proposed_advance)}%"></i></span><b>${oc.proposed_advance}</b></div>
@@ -212,7 +262,7 @@ function renderVerdict() {
     ${oc.clamps.length ? `<ul class="why">${oc.clamps.map((c) => `<li>${esc(clampSentence(c))}</li>`).join('')}</ul>` : o.status === 'committed' ? '<p class="hint">Nothing was clamped: the offer sat inside every limit.</p>' : ''}
     ${o.status === 'committed' ? `<p>Repay <b>${oc.repay}</b> gold (${interest} interest) by the end of day <b>${oc.due_day}</b>, or your ${o.bond} gold bond burns and a con lands in the ledger as ${esc(classLabel(oc.class))}.</p>` : ''}
     ${o.status === 'refused' ? `<p>The road filed this pitch as ${esc(classLabel(oc.class))}. Your bond is back in your purse.</p>` : ''}
-    <p class="fine" style="margin-top:12px">${offerTx[o.id] ? `<a href="${esc(txUrl(cfg.explorer, offerTx[o.id]))}" target="_blank" rel="noreferrer">Your pitch transaction</a>. ` : ''}${esc(answeredLine(answeredMs))}${oc.signer ? `Answer signed by ${esc(oc.signer)}. ` : ''}Response ${esc(shortId(oc.response_hash, 10, 6))}. Request ${esc(shortId(o.request_hash, 10, 6))}.</p>`;
+    <p class="fine" style="margin-top:12px">${offerTx[o.id] ? `<a href="${esc(txUrl(cfg.explorer, offerTx[o.id]))}" target="_blank" rel="noreferrer">Your pitch transaction</a>. ` : ''}${esc(answeredLine(answeredMs))}Response ${esc(shortId(oc.response_hash, 10, 6))}. Request ${esc(shortId(o.request_hash, 10, 6))}.</p>`;
 }
 
 function renderMine() {
@@ -295,7 +345,9 @@ async function refresh() {
       records = recs; wanted = wd; history = hist; news = [n0, n1, n2];
       rumours = Object.fromEntries(CLASSES.map((c, i) => [c, bal[i]]));
       last = hist.find((o) => o.status !== 'pending') ?? null;
+      lastBatch = last?.batch ? await chain.view<BatchV>('batch', { batch_id: last.batch }) : null;
     }
+    await captureRequest();
   } catch (e: any) {
     $('#movetext').textContent = `Could not read the road: ${String(e?.message ?? e).slice(0, 120)}`;
     return;
@@ -322,6 +374,7 @@ async function onboard() {
 }
 
 async function act(name: string, args: Record<string, unknown>, label: string) {
+  const dayBefore = st?.day ?? 0;
   busy = label;
   errMsg = '';
   if (name === 'offer') { pendingSince = Date.now(); answeredMs = 0; }
@@ -336,7 +389,12 @@ async function act(name: string, args: Record<string, unknown>, label: string) {
       }
     }
   } catch (e: any) {
-    errMsg = explain(String(e?.message ?? e)).slice(0, 200);
+    const message = explain(String(e?.message ?? e));
+    if (name === 'advance_day' && message.includes('the day has not ended yet')) {
+      const fresh = await chain.view<StateV>('state');
+      if (fresh.day > dayBefore) st = fresh;
+      else errMsg = message.slice(0, 200);
+    } else errMsg = message.slice(0, 200);
     if (name === 'offer') { pendingSince = 0; answeredMs = 0; }
   } finally {
     busy = '';
@@ -398,6 +456,10 @@ setInterval(() => {
 
 async function boot() {
   cfg = await loadConfig();
+  try {
+    const r = await fetch('/attestation.json', { cache: 'no-store' });
+    if (r.ok) attestation = await r.json();
+  } catch { attestation = null; }
   chain = new Chain(cfg, identity());
   skeleton();
   renderBar();

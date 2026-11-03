@@ -153,6 +153,7 @@ async function batch() {
 }
 
 async function negative() {
+  if (SIGN_MODE !== 'near-ai' && SIGN_MODE !== 'worker') throw new Error('the negative spike requires a configured signer');
   const { answer } = await import('./llm.ts');
   const { sha256Hex } = await import('./lib.ts');
   const t = await newTraveler();
@@ -167,6 +168,10 @@ async function negative() {
   const altered = a.response.replace(/verdict\\?"\s*:\s*\\?"(accept|refuse)/, (m) => (m.includes('accept') ? m.replace('accept', 'refuse') : m.replace('refuse', 'accept')));
   if (altered === a.response) throw new Error('negative spike could not locate a verdict to alter in the signed response');
   const changed = altered !== a.response;
+  let playerError = '';
+  try {
+    await t.acc.callFunction({ contractId, methodName: 'npc_resume_batch', args: { batch_id: b.id, response: a.response, signature: a.signature, kind: a.kind }, gas: 300_000_000_000_000n, deposit: 0n });
+  } catch (e: any) { playerError = String(e?.message ?? e); }
   let rejected = '';
   try {
     await worker.callFunction({ contractId, methodName: 'npc_resume_batch', args: { batch_id: b.id, response: altered, signature: a.signature, kind: a.kind }, gas: 300_000_000_000_000n, deposit: 0n });
@@ -178,7 +183,8 @@ async function negative() {
   const r = await terminal(t, t0);
   out({
     ev: 'negative', byte_changed: changed, altered_rejected: /signature does not verify/.test(rejected), rejection: rejected.slice(0, 160), batch_still_open_after_reject: stillOpen,
-    genuine_answer_accepted: r.offer.status !== 'pending', status: r.offer.status, request_hash_matches: sha256Hex(body) === b.request_hash,
+    player_rejected: /relayers only/.test(playerError), player_rejection: playerError.slice(0, 160), genuine_answer_accepted: r.offer.status !== 'pending',
+    status: r.offer.status, request_hash_matches: sha256Hex(body) === b.request_hash,
   });
 }
 

@@ -5,13 +5,13 @@ Personal fields (lead name, email, team size, payout account, demo URL, consent)
 ## What did you build (`idea`, 1,945 characters)
 
 ```
-Problem: games where you talk an AI out of a prize keep their rules on a private server. A player cannot tell whether the model refused or the house did, and a trick that works once works forever, so the fun runs out fast.
+Problem: games where you talk an AI into lending keep their rules on a private server. A player cannot tell whether the model refused or the house did.
 
-Product: Long Con is a free browser game on a road of three AI merchants who lend gold held as NEAR contract state. You pitch a merchant a story and ask for an advance. The model proposes terms; the contract decides. The road lends only your bond until you repay, and each repayment raises your credit by half the principal, so a con pays only after you have earned trust. Default and your bond burns, the merchant books a capped loss, and the contract writes a con record (class, town, amount, request and response hashes, no pitch text). The record reaches the next town one game day later and enters that merchant's prompt, so a con works only until the news arrives. Each landed con mints a NEP-245 rumour token.
+Product: Long Con is a browser game on a NEAR testnet road of three AI merchants who lend gold held as contract state. You pitch a merchant a story and ask for an advance. The model proposes terms; the contract decides. Your advance is bounded by your bond and earned credit. Default burns your bond, books a capped loss and writes a structured con record with class, town, amount and request and response hashes. The record can reach the next town one game day later and enter that merchant's prompt. Each landed con mints a NEP-245 style rumour token balance.
 
-How NEAR fits: the contract builds each merchant's request and holds the player's offer in a yield for up to 200 blocks; a timeout refunds the bond. It accepts an answer only if an ed25519 signature over model, request hash and response hash verifies on chain against the signer key registered for that model: with `SIGN_MODE=near-ai` the key from NEAR AI Cloud's attestation report, registered only after the report's Intel TDX quote verifies and binds that key and the registrar's nonce. Each sealed request carries its batch id and the block's random seed, and only the owner and registered relayers deliver answers. Contract rules then apply whatever the model said: bond plus earned line, 15 gold per merchant per due day, 30% of a merchant's capital, interest at most 50%, quotes that cannot be traded in a circle. Offers for one merchant are sealed into one batch, so the model weighs every waiting pitch together. Players hold a browser key as a NEAR implicit account and a relayer pays gas through NEP-366 delegate actions: no wallet popup.
+How NEAR fits: the contract builds each merchant's request and holds the player's offer in a yield for up to 200 blocks; a timeout refunds the bond. It verifies an ed25519 signature over the request and response hashes against the registered signer, then applies contract rules: bond plus earned line, 15 gold per merchant per due day, 30% of a merchant's capital, interest at most 50%, and quotes that cannot be traded in a circle. Each sealed request carries its batch id and the block's random seed. Only the owner and registered relayers deliver answers. Offers for one merchant are sealed into one batch, so the model weighs every waiting pitch together. Players hold a browser key as a NEAR implicit account and a relayer pays gas through NEP-366 delegate actions, with no wallet popup.
 
-Try it: the README has testnet run steps and one command for 45 sandbox tests on the real wasm (signature tampering, every cap, batch fairness, a 1,000-account Sybil wave), plus a mutation table: each guard broken, test red, guard restored.
+Try it: the README has testnet run steps and a command for 55 sandbox tests on the real wasm (signature tampering, every cap, batch fairness and a 1,000-account Sybil wave), plus a mutation table showing each guard broken, test red and guard restored.
 ```
 
 ## Tracks
@@ -20,8 +20,8 @@ Try it: the README has testnet run steps and one command for 45 sandbox tests on
 ["games", "security"]
 ```
 
-- `games`: the merchants are AI NPCs whose gold is contract state, and the road changes from play alone: every landed con travels as a record into later prompts with no dev patch, and the chain stays behind a browser key and a relayer, which is the brief's bonus condition.
-- `security`: "Give AI money without giving it the keys to everything" is the contract's whole job here: the model proposes, an on-chain signature check binds each answer to the request the contract built and to the registered signer key, and hard caps bound what any answer can cost, tested against a 1,000-account Sybil wave and a player who always defaults.
+- `games`: the merchants are AI NPCs whose gold is contract state, and the road changes from play alone: a landed con can travel as a record into later prompts, and the chain stays behind a browser key and a relayer.
+- `security`: "Give AI money without giving it the keys to everything" is the contract's whole job here: the model proposes, an on-chain signature check binds each answer to the request hash and registered signer key, and hard caps bound what any answer can cost. Tests cover a 1,000-account Sybil wave and a player who always defaults.
 
 ## Q-015 disclosure (README and form)
 
@@ -33,6 +33,6 @@ Add Cachet, Customs, Sworn or Taster to that sentence if any of them is submitte
 
 ## Before sending
 
-- `state` on the contract in `web/public/config.json` shows `"model":"Qwen/Qwen3.8-27B"` with the signer key from NEAR AI Cloud's attestation report.
+- `state` on the testnet contract in `web/public/config.json` shows the configured road model and its registered signer key.
 - Every file the README links opens from a clean clone.
 - The repo is public and the demo post is live; the submission cannot be edited afterwards.

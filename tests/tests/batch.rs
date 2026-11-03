@@ -72,8 +72,8 @@ async fn one_storage_stake_covers_24_maximum_term_sheet_batches() -> Result<()> 
     let w = World::new(Cfg::default()).await?;
     let root = w.worker.root_account()?;
     let player = root.create_subaccount("staked").initial_balance(near_workspaces::types::NearToken::from_near(2)).transact().await?.into_result()?;
-    w.owner.call(w.contract.id(), "sponsor_join").args_json(json!({"account_id": player.id()})).deposit(join_deposit()).max_gas().transact().await?.into_result()?;
     let before = w.contract.view_account().await?.storage_usage;
+    w.owner.call(w.contract.id(), "sponsor_join").args_json(json!({"account_id": player.id()})).deposit(join_deposit()).max_gas().transact().await?.into_result()?;
     let reason = "é".repeat(79);
     let content = format!(r#"{{"decisions":[{{"slot":1,"verdict":"accept","advance":18446744073709551615,"repay":18446744073709551615,"due_days":4294967295,"buy_price":18446744073709551615,"sell_price":18446744073709551615,"class":"borrowed_authority","reason":"{reason}"}}]}}"#);
     for i in 0..24 {

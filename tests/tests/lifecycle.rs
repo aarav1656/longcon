@@ -152,8 +152,8 @@ async fn advance_day_handles_45_defaults_under_150_tgas() -> Result<()> {
             for offer in chunk { offer.status.await?.into_result()?; }
         }
     }
-    w.advance_day(&players[0]).await?.into_result()?;
-    let receipt = w.advance_day(&players[0]).await?.into_result()?;
+    w.owner_call("advance_day", json!({})).await?.into_result()?;
+    let receipt = w.owner_call("advance_day", json!({})).await?.into_result()?;
     let gas_tgas = receipt.total_gas_burnt.as_gas() / 1_000_000_000_000;
     println!("45-default advance_day gas_burnt: {gas_tgas} Tgas");
     assert_eq!(w.view("con_records", json!({"from": 0, "limit": 50})).await?.as_array().unwrap().len(), 45);

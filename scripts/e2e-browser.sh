@@ -26,11 +26,15 @@ import http.server, os, re, sys
 INJ = (b"<script>window.__errs=[];"
        b"addEventListener('error',function(e){__errs.push('error: '+e.message)});"
        b"addEventListener('unhandledrejection',function(e){__errs.push('rejection: '+(e.reason&&e.reason.message||e.reason))})</script>")
-class H(http.server.SimpleHTTPRequestHandler):
+BASE = http.server.SimpleHTTPRequestHandler
+if os.environ.get("E2E_BASE_HANDLER"):  # a repo's own server module with a Handler class (e.g. an API proxy)
+    sys.path.insert(0, sys.argv[2]); BASE = __import__(os.environ["E2E_BASE_HANDLER"]).Handler
+class H(BASE):
     def log_message(self, *a): pass
     def end_headers(self):
         self.send_header("Cache-Control", "no-store"); super().end_headers()
     def do_GET(self):
+        if self.path.startswith(os.environ.get("E2E_PASS_PREFIX", "\0")): return super().do_GET()
         p = self.translate_path(self.path.split("?")[0].split("#")[0])
         if os.path.isdir(p): p = os.path.join(p, "index.html")
         if p.endswith(".html") and os.path.isfile(p):
@@ -44,9 +48,11 @@ class H(http.server.SimpleHTTPRequestHandler):
 os.chdir(sys.argv[2])
 http.server.ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 PY
-python3 "$TMP/serve.py" "$PORT" "$WEB" & SRV=$!
-for _ in $(seq 50); do curl -sf "http://127.0.0.1:$PORT/" >/dev/null && break; sleep 0.1; done
-curl -sf "http://127.0.0.1:$PORT/" >/dev/null || fail "local server did not start"
+start_server() { # optional env first: E2E_BASE_HANDLER=<module in web/> E2E_PASS_PREFIX=<path prefix the handler owns>
+  python3 "$TMP/serve.py" "$PORT" "$WEB" & SRV=$!
+  for _ in $(seq 50); do curl -sf "http://127.0.0.1:$PORT/" >/dev/null && break; sleep 0.1; done
+  curl -sf "http://127.0.0.1:$PORT/" >/dev/null || fail "local server did not start"
+}
 
 open_page() { # path-with-query; opens a fresh tab, switches to it
   "${B[@]}" open "http://127.0.0.1:$PORT/$1" >/dev/null
@@ -54,8 +60,9 @@ open_page() { # path-with-query; opens a fresh tab, switches to it
   [ -n "$TAB" ] && [ "$TAB" != null ] || fail "tab did not open"
   "${B[@]}" use "$TAB" >/dev/null
 }
-goto_page() { "${B[@]}" goto "http://127.0.0.1:$PORT/$1" >/dev/null; }  # same tab, new document (fresh __errs)
-ev() { "${B[@]}" eval "$1" | jq -r '.value'; }      # eval JS, raw value
+# other agents share the profile and may switch the attached tab, so every call re-attaches to ours first
+goto_page() { "${B[@]}" use "$TAB" >/dev/null; "${B[@]}" goto "http://127.0.0.1:$PORT/$1" >/dev/null; }  # same tab, new document (fresh __errs)
+ev() { "${B[@]}" use "$TAB" >/dev/null; "${B[@]}" eval "$1" | jq -r '.value'; }      # eval JS, raw value
 evj() { ev "JSON.stringify($1)"; }                  # eval JS expr, JSON out
 waitjs() { # JS predicate, timeout seconds
   local end=$((SECONDS + ${2:-60}))
@@ -139,6 +146,7 @@ check_road() { # $1 = contract id, rest of the page already loaded
   assert_no_errors
 }
 
+start_server
 open_page "index.html"
 check_road "$GAME"
 st="$(rpc_view "$RPC" "$GAME" state '{}')"

@@ -43,7 +43,7 @@ test('merchants show treasury, loans and the cap they are held to', () => {
 
 test('the default road in config.json is the new testnet road', () => {
   const cfg = JSON.parse(readFileSync(new URL('../public/config.json', import.meta.url), 'utf8'));
-  expect(cfg.contract_id).toBe('longcon3-game.testnet');
+  expect(cfg.contract_id).toBe('longcon4-game.testnet');
   expect(cfg.rpc).toStartWith('https://');
 });
 

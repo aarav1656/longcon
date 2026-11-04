@@ -21,7 +21,7 @@ model="$(jq -r .model <<<"$state")"
 echo "day_length_ms $day"
 [ "$model" = "$MODEL" ] || fail "model $model (expected $MODEL)"
 echo "model $model"
-signers="$(jq -c '.signers | from_entries' <<<"$state")"
+signers="$(jq -c '.signers | map({key: .[0], value: .[1]}) | from_entries' <<<"$state")"
 if [ "$SIGNER" = worker ]; then
   jq -e --arg n "worker:$MODEL" '.[$n] | type == "string" and length == 64' <<<"$signers" >/dev/null || fail "worker signer missing for $MODEL"
 else

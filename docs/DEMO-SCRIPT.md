@@ -7,19 +7,20 @@ Long Con is a browser game on NEAR testnet. Three AI merchants lend contract-hel
 Copy `.env.example` to `.env` and configure the model endpoint and worker signing seed. Set `LLM_MODEL` to the same model in the contract and worker configuration, then run:
 
 ```sh
-PREFIX=longcon3 LLM_MODEL=agy/gemini-3.1-flash-lite scripts/testnet-up.sh
-PREFIX=longcon3 SIGN_MODE=worker scripts/register-signer.sh
-PREFIX=longcon3 SIGN_MODE=worker scripts/play.sh
+PREFIX=longcon4 LLM_MODEL=Qwen/Qwen3.8-27B scripts/testnet-up.sh
+PREFIX=longcon4 SIGN_MODE=near-ai scripts/register-signer.sh
+CONTRACT_ID=longcon4-game.testnet scripts/signer-check.sh
+PREFIX=longcon4 SIGN_MODE=near-ai scripts/play.sh
 ```
 
-Open `http://127.0.0.1:5173/game.html` in a fresh browser profile. The signer is labelled `worker:<model>` in this mode. The browser checks the request hash and signature against the key registered on the contract.
+Open `http://127.0.0.1:5173/game.html` in a fresh browser profile. The registered signer is the signing address of NEAR AI Cloud's attestation report for the model, registered after the Intel TDX quote and the nonce verified, and `scripts/signer-check.sh` compares it with a freshly fetched report. The browser checks the request hash and signature against the key registered on the contract.
 
 ## Play
 
 1. Select Marta and choose **Seed grain**. Press Pitch. Read the merchant's proposed terms beside the contract's allowed terms.
 2. Leave the debt unpaid. End each day after its countdown reaches zero until the debt defaults. The ledger shows the con record, bond burned and rumour token.
 3. End one more day. Select Pell and pitch again. Read the arrived news in Pell's card and in the request checked by the browser.
-4. Run `near contract call-function as-read-only longcon3-game.testnet audit json-args '{}' network-config testnet now` and confirm `gold_ok` is true.
+4. Run `near contract call-function as-read-only longcon4-game.testnet audit json-args '{}' network-config testnet now` and confirm `gold_ok` is true.
 
 ## What the contract does
 

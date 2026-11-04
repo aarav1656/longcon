@@ -4,7 +4,7 @@ The human posts; no agent sends anything. Attach the 90-second video from `docs/
 
 Before posting, two checks:
 
-1. `near contract call-function as-read-only longcon2-game.testnet state json-args '{}' network-config testnet now` shows `"model":"Qwen/Qwen3.8-27B"` and a signer key equal to the one in NEAR AI Cloud's attestation report. Variant A and the long form say NEAR AI Cloud signs each answer; that has to be true of the road in the video.
+1. `near contract call-function as-read-only longcon4-game.testnet state json-args '{}' network-config testnet now` shows `"model":"Qwen/Qwen3.8-27B"` and a signer key equal to the one in NEAR AI Cloud's attestation report. Variant A and the long form say NEAR AI Cloud signs each answer; that has to be true of the road in the video.
 2. Variant B and the long form describe the recorded take: one repaid loan, then 9 gold borrowed and not repaid. Edit the amounts to what the take shows.
 
 ## Variant A (276): the trust problem

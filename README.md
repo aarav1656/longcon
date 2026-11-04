@@ -31,13 +31,14 @@ Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `w
    See four faucet funded accounts (`mygame-game.testnet` is the contract) and `The "new" call ... succeeded`.
 6. Register the configured signer and the worker as a relayer: `PREFIX=mygame scripts/register-signer.sh`. In `near-ai` mode, registration verifies the Intel TDX quote of the gateway and every model candidate and checks the signer and nonce bindings before it registers their keys.
    See the signer and road registration events.
+   Check the registered signer against a freshly fetched report: `CONTRACT_ID=mygame-game.testnet scripts/signer-check.sh`. It fails unless every model candidate's `signing_address` and the gateway's equal the contract's registered keys, then the worker re-verifies the Intel TDX quotes.
 7. Play: `PREFIX=mygame scripts/play.sh`, then open http://127.0.0.1:5173/game.html.
    Pick Marta, press a pitch starter, press Pitch. See the verdict panel show what the merchant offered, what the road allowed, and which cap cut it. Press End day until the due day has passed to default, then once more for Pellgate to hear the news. Pitch the next town and read the news included in its request.
 
 8. Read your own road without a build: `python3 -m http.server 8080 --directory web`, then open http://127.0.0.1:8080/?contract=mygame-game.testnet.
    See three merchants with treasuries and open advances, each panel stamped with the block it was read at, and every con record once a debt has defaulted.
 
-The game and ledger default to `longcon3-game.testnet`. Set up that testnet road with step 5 before opening either page.
+The game and ledger default to `longcon4-game.testnet`. Set up that testnet road with step 5 before opening either page.
 
 ## Ledger page
 
@@ -50,7 +51,7 @@ The game and ledger default to `longcon3-game.testnet`. Set up that testnet road
 | Con records | `call_function` `con_records` with `from: 0, limit: 50` | Landed cons: class, town, day, principal, bond burned, and request, response and configuration hashes |
 | Read stamp | `block` with `finality: final` | The block height and time of the read, printed under each panel |
 
-Open it with `python3 -m http.server 8080 --directory web` and browse to `/?contract=<account id>` for any road, with `&rpc=<url>` and `&network=mainnet|testnet` to point it elsewhere. The default road, `longcon3-game.testnet`, comes from `web/public/config.json`. Each panel prints the block height and time it was read at. The playable client is `web/game.html`; `(cd web && bun test ./test)` covers the page's rendering.
+Open it with `python3 -m http.server 8080 --directory web` and browse to `/?contract=<account id>` for any road, with `&rpc=<url>` and `&network=mainnet|testnet` to point it elsewhere. The default road, `longcon4-game.testnet`, comes from `web/public/config.json`. Each panel prints the block height and time it was read at. The playable client is `web/game.html`; `(cd web && bun test ./test)` covers the page's rendering.
 
 ## How it works
 

@@ -3,7 +3,7 @@ import { provider, view } from './chain.ts';
 import { verifiedSigners } from './attest-check.ts';
 
 const source = process.argv[2] ?? 'https://longcon-near.vercel.app/attestation.json';
-const contractId = process.env.CONTRACT_ID ?? 'longcon3-game.testnet';
+const contractId = process.env.CONTRACT_ID ?? 'longcon4-game.testnet';
 const accepted = (process.env.ATTEST_TCB_STATUSES ?? 'UpToDate').split(',').map((s) => s.trim());
 const text = source.startsWith('http://') || source.startsWith('https://')
   ? await (async () => { const r = await fetch(source); if (!r.ok) throw new Error(`attestation file returned ${r.status}`); return r.text(); })()

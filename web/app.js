@@ -159,7 +159,14 @@ async function main() {
   const rpcUrl = cfg.rpc || defaultRpc(network);
   const explorer = cfg.explorer || defaultExplorer(network);
   let attestation = null;
-  try { const r = await fetch('/attestation.json', { cache: 'no-store' }); if (r.ok) attestation = await r.json(); } catch (e) { attestation = null; }
+  for (const path of ['attestation.json', 'public/attestation.json']) {
+    try {
+      const r = await fetch(path, { cache: 'no-store' });
+      if (r.ok) { attestation = await r.json(); break; }
+    } catch (e) {
+      // try the next location
+    }
+  }
 
   if (!contractId) {
     const msg = 'No contract id configured.';

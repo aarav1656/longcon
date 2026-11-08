@@ -58,4 +58,13 @@ sig="$(jp "document.getElementById('signers').innerText")"
 case "$sig" in *"matches the published attestation report"*) pass "signers match the published attestation report";; *) fail "signers panel does not show attestation match: $sig";; esac
 goto_page "index.html?contract=$RECORDS_GAME"
 check_road "$RECORDS_GAME"
+sig="$(jp "document.getElementById('signers').innerText")"
+case "$sig" in
+  *"does not match the published attestation report"*) ;;
+  *) fail "[$RECORDS_GAME] signers panel does not show the expected attestation mismatch: $sig";;
+esac
+case "$sig" in
+  *"matches the published"*) fail "[$RECORDS_GAME] signers panel incorrectly shows an attestation match: $sig";;
+  *) pass "[$RECORDS_GAME] signers show attestation mismatch";;
+esac
 echo "PASS longcon browser e2e"

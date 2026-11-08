@@ -61,7 +61,7 @@ async function handle(b: BatchView, head: number, oldestOffer: number) {
   const t1 = Date.now();
   let res;
   try {
-    res = await acc.callFunction({
+    res = await acc.callFunctionRaw({
       contractId,
       methodName: 'npc_resume_batch',
       args: { batch_id: b.id, response: a.response, signature: a.signature, kind: a.kind },

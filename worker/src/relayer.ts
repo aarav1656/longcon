@@ -87,7 +87,7 @@ Bun.serve({
         const call = callFor(checked);
         if (call.kind === 'sponsor_join') {
           if (!joinBudget.take(who)) return json({ error: 'join limit reached for now' }, 429);
-          const res: any = await relayer.callFunction({ contractId, methodName: 'sponsor_join', args: call.args, gas: 30_000_000_000_000n, deposit: JOIN_DEPOSIT });
+          const res: any = await relayer.callFunctionRaw({ contractId, methodName: 'sponsor_join', args: call.args, gas: 30_000_000_000_000n, deposit: JOIN_DEPOSIT });
           const tx = res?.transaction?.hash ?? res?.transaction_outcome?.id ?? res?.transactionOutcome?.id;
           return json({ ok: true, method: 'join', tx });
         }

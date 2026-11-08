@@ -30,5 +30,5 @@ Period square, stepped bars (data-ful: loss cap used, credit cap used), border a
 ## Motion
 Hover: row ground to `paper-2`, title nudges 8px, 0.18s ease. The thinking clock steps in whole seconds. `prefers-reduced-motion: reduce` removes all transitions.
 
-## Status without a second ink
+## Committed, refused and timed-out marks share one ink
 Committed: solid period square. Refused: hollow period square. Timed out: dashed square. Words always accompany the mark.

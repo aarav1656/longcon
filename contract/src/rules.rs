@@ -21,6 +21,12 @@ pub const MAX_OFFERS_PER_ACCOUNT: u32 = 24;
 /// every offer the allowance above permits.
 pub const JOIN_DEPOSIT_YOCTO: u128 = 200_000_000_000_000_000_000_000;
 pub const TRADE_LINE_DIV: u64 = 10;
+/// Each recorded unpaid default takes this share off the credit line every merchant offers the
+/// account, up to REP_HAIRCUT_MAX_PCT, so a con at one merchant is priced by all of them.
+pub const REP_HAIRCUT_PCT_PER_DEFAULT: u64 = 25;
+pub const REP_HAIRCUT_MAX_PCT: u64 = 75;
+/// Reputation changes per emitted event, so a day of mass defaults stays under the log limits.
+pub const REP_EVENT_CHUNK: usize = 16;
 pub const REPAY_LINE_DIV: u64 = 2;
 pub const ON_TERMS_TGAS: u64 = 30;
 
@@ -87,6 +93,18 @@ pub fn treasury_room(gold: u64, outstanding: u64) -> u64 {
 
 pub fn exposure_room(locked_bonds: u64, earned_line: u64, outstanding: u64) -> u64 {
     locked_bonds.saturating_add(earned_line).saturating_sub(outstanding)
+}
+
+/// Share of the credit line withheld from an account with `defaults` recorded unpaid defaults.
+pub fn reputation_haircut_pct(defaults: u32) -> u64 {
+    (defaults as u64).saturating_mul(REP_HAIRCUT_PCT_PER_DEFAULT).min(REP_HAIRCUT_MAX_PCT)
+}
+
+/// The most any merchant may advance this account: the exposure room less the reputation haircut.
+/// Rounds down, so one recorded default lowers every non-zero line.
+pub fn credit_line(locked_bonds: u64, earned_line: u64, outstanding: u64, defaults: u32) -> u64 {
+    let room = exposure_room(locked_bonds, earned_line, outstanding);
+    room.saturating_mul(100 - reputation_haircut_pct(defaults)) / 100
 }
 
 pub fn daily_room(already_due_that_day: u64) -> u64 {
@@ -217,6 +235,18 @@ mod tests {
         assert_eq!(exposure_room(10, 4, 0), 14);
         assert_eq!(exposure_room(10, 4, 14), 0);
         assert_eq!(exposure_room(0, 0, 5), 0);
+    }
+
+    #[test]
+    fn each_recorded_default_lowers_the_credit_line_to_a_floor() {
+        assert_eq!(credit_line(8, 0, 0, 0), 8);
+        assert_eq!(credit_line(8, 0, 0, 1), 6);
+        assert_eq!(credit_line(8, 0, 0, 2), 4);
+        assert_eq!(credit_line(8, 0, 0, 3), 2);
+        assert_eq!(credit_line(8, 0, 0, 40), 2, "the haircut stops at 75 percent");
+        for room in 1..50 {
+            assert!(credit_line(room, 0, 0, 1) < credit_line(room, 0, 0, 0), "room {room}");
+        }
     }
 
     #[test]

@@ -242,7 +242,7 @@ impl Contract {
         require!(!pitch.chars().any(|c| (c as u32) < 0x20 && c != '\n'), "pitch may not contain control characters");
         let m = self.merchants.get(merchant as usize).unwrap_or_else(|| env::panic_str("no such merchant")).clone();
 
-        let exposure = exposure_room(p.locked_bonds + bond, p.earned_line, p.outstanding);
+        let exposure = credit_line(p.locked_bonds + bond, p.earned_line, p.outstanding, p.cons_landed);
         require!(exposure > 0, "the road would lend you nothing: raise your bond or earn credit by trading and repaying");
         let t_room = treasury_room(m.gold, m.outstanding);
         require!(t_room > 0 && m.gold > 0, "this merchant's coffers are at their cap");
@@ -327,7 +327,7 @@ impl Contract {
             .map(|(o, p)| prompt::Traveler {
                 advance_room: o
                     .ask
-                    .min(exposure_room(p.locked_bonds, p.earned_line, p.outstanding))
+                    .min(credit_line(p.locked_bonds, p.earned_line, p.outstanding, p.cons_landed))
                     .min(t_room)
                     .min(m.gold)
                     .min(LOSS_CAP_PER_DAY),
@@ -522,6 +522,7 @@ impl Contract {
         let old = self.day;
         self.day += 1;
         self.day_started_ns = now;
+        let mut reputation: Vec<(AccountId, u32)> = vec![];
         for id in self.due_index.remove(&old).unwrap_or_default() {
             let Some(d) = self.debts.get_mut(&id) else { continue };
             if d.status != DebtStatus::Open {
@@ -557,9 +558,21 @@ impl Contract {
                 config_hash: d.config_hash,
             };
             emit("con_landed", json!({"record_id": rec.id, "class": rec.class, "town": rec.town, "loss": rec.loss}));
+            reputation.push((d.player.clone(), p.cons_landed));
             self.mint_rumour(&rec);
             self.records.push(rec);
             self.debts.remove(&id);
+        }
+        // One event per chunk of players keeps a day of mass defaults under the 16 KiB log budget:
+        // `cons_landed[i]` is the recorded default count of `players[i]`, and the credit haircut
+        // is REP_HAIRCUT_PCT_PER_DEFAULT per default up to REP_HAIRCUT_MAX_PCT.
+        for chunk in reputation.chunks(REP_EVENT_CHUNK) {
+            let players: Vec<&AccountId> = chunk.iter().map(|(a, _)| a).collect();
+            let cons: Vec<u32> = chunk.iter().map(|(_, c)| *c).collect();
+            emit(
+                "reputation_changed",
+                json!({"players": players, "cons_landed": cons, "haircut_pct_per_default": REP_HAIRCUT_PCT_PER_DEFAULT, "haircut_max_pct": REP_HAIRCUT_MAX_PCT}),
+            );
         }
         emit("day_advanced", json!({"day": self.day}));
     }
@@ -596,6 +609,8 @@ impl Contract {
         Some(PlayerView {
             player: p.clone(),
             debts: p.open_debts.iter().filter_map(|id| self.debts.get(id).cloned()).collect(),
+            credit_line: credit_line(p.locked_bonds + p.gold, p.earned_line, p.outstanding, p.cons_landed),
+            credit_haircut_pct: reputation_haircut_pct(p.cons_landed),
         })
     }
 
@@ -844,7 +859,7 @@ impl Contract {
         let m = &self.merchants[mi];
         let room = Room {
             ask: offer.ask,
-            exposure: exposure_room(p.locked_bonds, p.earned_line, p.outstanding),
+            exposure: credit_line(p.locked_bonds, p.earned_line, p.outstanding, p.cons_landed),
             daily_loss: daily_room(self.due_exposure.get(&(offer.merchant, due_day)).copied().unwrap_or(0)),
             treasury: treasury_room(m.gold, m.outstanding),
             gold: m.gold,
@@ -942,6 +957,11 @@ pub struct PlayerView {
     #[serde(flatten)]
     pub player: Player,
     pub debts: Vec<Debt>,
+    /// The most any merchant would advance if this account bonded all its gold, after the
+    /// reputation haircut.
+    pub credit_line: u64,
+    /// Share of the exposure room withheld because of recorded unpaid defaults.
+    pub credit_haircut_pct: u64,
 }
 
 #[near(serializers = [json])]

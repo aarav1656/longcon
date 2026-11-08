@@ -6,16 +6,17 @@ Command: `cargo test --workspace --no-fail-fast` (the sandbox binaries build the
 
 | Binary | Async sandbox tests |
 |---|---|
-| unit (`contract`) | 25 |
+| unit (`contract`) | 26 |
 | attestation | 7 |
 | batch | 13 |
 | clamps | 11 |
 | guards | 7 |
 | hardening | 6 |
 | lifecycle | 7 |
+| reputation | 2 |
 | rumours | 2 |
 | sybil | 2 |
-| total | 80 tests |
+| total | 83 tests |
 
 Sandbox test counts are from `grep -c '#[tokio::test]' tests/tests/*.rs`; contract unit test count is from `cargo test -p longcon --lib -- --list`.
 
@@ -79,6 +80,8 @@ Command: `python3 scripts/mutate.py` (one row: `python3 scripts/mutate.py M25`).
 | M50 | on_terms: a settled offer drops its pitch | `contract/src/lib.rs` | `hardening::a_settled_offer_drops_its_pitch_and_an_account_has_a_lifetime_offer_allowance` | test a_settled_offer_drops_its_pitch_and_an_account_has_a_lifetime_offer_allowance ... FAILED / thread 'a_settled_offer_drops_its_pitch_and_an_account_has_a_lifetime_offer_allowance' (9377629) panicked at tests/tests/hardening.rs:126:5: / assertion 'left == right' failed: request_hash already binds the pitch, so state does not keep it / left: String("a pitch that must not stay in state forever") / right: String("") | test a_settled_offer_drops_its_pitch_and_an_account_has_a_lifetime_offer_allowance ... ok / test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 52.03s | KILLED |
 | M51 | offer: an account has a lifetime offer allowance | `contract/src/lib.rs` | `hardening::a_settled_offer_drops_its_pitch_and_an_account_has_a_lifetime_offer_allowance` | test a_settled_offer_drops_its_pitch_and_an_account_has_a_lifetime_offer_allowance ... FAILED / thread 'a_settled_offer_drops_its_pitch_and_an_account_has_a_lifetime_offer_allowance' (9433992) panicked at tests/tests/hardening.rs:147:5: / test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 72.01s | test a_settled_offer_drops_its_pitch_and_an_account_has_a_lifetime_offer_allowance ... ok / test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 51.42s | KILLED |
 | M52 | npc_resume_batch: an operator signature is reported as worker:<model> | `contract/src/lib.rs` | `hardening::an_operator_key_signs_as_worker_and_the_outcome_says_so` | test an_operator_key_signs_as_worker_and_the_outcome_says_so ... FAILED / thread 'an_operator_key_signs_as_worker_and_the_outcome_says_so' (9624438) panicked at tests/tests/hardening.rs:158:88: / test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 58.28s | test an_operator_key_signs_as_worker_and_the_outcome_says_so ... ok / test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 80.48s | KILLED |
+| M53 | reputation: a recorded default lowers the credit line | `contract/src/rules.rs` | `reputation::pell_credit_line_reflects_marta_default` | test pell_credit_line_reflects_marta_default ... FAILED / thread 'pell_credit_line_reflects_marta_default' panicked at tests/tests/reputation.rs:39:5: / left: Number(20) / right: Number(15) / test result: FAILED. 0 passed; 1 failed | test pell_credit_line_reflects_marta_default ... ok / test result: ok. 1 passed | KILLED |
+| M54 | reputation: the commit clamp uses the reputation line | `contract/src/lib.rs` | `reputation::pell_credit_line_reflects_marta_default` | test pell_credit_line_reflects_marta_default ... FAILED / thread 'pell_credit_line_reflects_marta_default' panicked at tests/tests/reputation.rs:49:5: / left: Number(8) / right: Number(6) / test result: FAILED. 0 passed; 1 failed | test pell_credit_line_reflects_marta_default ... ok / test result: ok. 1 passed | KILLED |
 
 ## Signer path checks (client side)
 

@@ -11,9 +11,20 @@ export const RPC: Record<string, string> = {
   mainnet: 'https://free.rpc.fastnear.com',
 };
 
-const rpcHosts = new Set([...Object.values(RPC), process.env.NEAR_RPC_URL ?? ''].filter(Boolean).map((u) => new URL(u).host));
+/** Public RPCs answer a burst with 429 independently of each other, so a rate limited call moves to the next endpoint before it waits. NEAR_RPC_URL takes a comma separated list. */
+const FALLBACKS: Record<string, string[]> = {
+  testnet: ['https://near-testnet.drpc.org', 'https://rpc.testnet.near.org', 'https://archival-rpc.testnet.near.org'],
+  mainnet: ['https://rpc.mainnet.near.org', 'https://archival-rpc.mainnet.near.org'],
+};
+export const rpcPool = (net = process.env.NEAR_NETWORK ?? 'testnet'): string[] => {
+  const given = (process.env.NEAR_RPC_URL ?? '').split(',').map((u) => u.trim()).filter(Boolean);
+  return [...new Set([...(given.length ? given : [RPC[net]]), ...(given.length ? [] : (FALLBACKS[net] ?? []))])];
+};
+
+const poolUrls = rpcPool();
+const rpcHosts = new Set(poolUrls.map((u) => new URL(u).host));
 const realFetch = globalThis.fetch;
-/** The public RPCs answer a burst with 429, or with HTTP 200 and a JSON-RPC error code -429, and near-api-js retries neither, so a game turn would fail. Ask again after a pause. */
+/** The public RPCs answer a burst with 429, or with HTTP 200 and a JSON-RPC error code -429, and near-api-js retries neither, so a game turn would fail. Ask the next endpoint, and after a full cycle ask again after a pause. */
 const rateLimited = async (r: Response): Promise<boolean> => {
   if (r.status === 429) return true;
   if (!r.ok) return false;
@@ -21,17 +32,20 @@ const rateLimited = async (r: Response): Promise<boolean> => {
   return text.length < 400 && /"code"\s*:\s*-429/.test(text);
 };
 globalThis.fetch = (async (input: any, init?: any) => {
-  const host = new URL(typeof input === 'string' ? input : (input.url ?? String(input))).host;
+  const url = typeof input === 'string' ? input : (input.url ?? String(input));
+  const host = new URL(url).host;
+  if (!rpcHosts.has(host) || typeof input !== 'string') return realFetch(input, init);
+  const start = Math.max(0, poolUrls.findIndex((u) => new URL(u).host === host));
   for (let attempt = 0; ; attempt++) {
-    const r = await realFetch(input, init);
-    if (!rpcHosts.has(host) || attempt >= 120 || !(await rateLimited(r))) return r;
-    await new Promise((res) => setTimeout(res, Math.min(800 * (attempt + 1), 5000)));
+    const r = await realFetch(poolUrls[(start + attempt) % poolUrls.length], init);
+    if (attempt >= 120 * poolUrls.length || !(await rateLimited(r))) return r;
+    if ((attempt + 1) % poolUrls.length === 0) await new Promise((res) => setTimeout(res, Math.min(800 * Math.ceil((attempt + 1) / poolUrls.length), 5000)));
   }
 }) as typeof fetch;
 
 export function provider(): JsonRpcProvider {
   const net = env('NEAR_NETWORK', 'testnet');
-  return new JsonRpcProvider({ url: process.env.NEAR_RPC_URL || RPC[net] });
+  return new JsonRpcProvider({ url: poolUrls[0] ?? RPC[net] });
 }
 
 export function account(idKey: string, keyKey: string): Account {

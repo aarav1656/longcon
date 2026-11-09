@@ -7,7 +7,7 @@ Command: `cargo test --workspace --no-fail-fast` (the sandbox binaries build the
 | Binary | Async sandbox tests |
 |---|---|
 | unit (`contract`) | 26 |
-| attestation | 7 |
+| attestation | 8 |
 | batch | 13 |
 | clamps | 11 |
 | guards | 7 |
@@ -82,6 +82,7 @@ Command: `python3 scripts/mutate.py` (one row: `python3 scripts/mutate.py M25`).
 | M52 | npc_resume_batch: an operator signature is reported as worker:<model> | `contract/src/lib.rs` | `hardening::an_operator_key_signs_as_worker_and_the_outcome_says_so` | test an_operator_key_signs_as_worker_and_the_outcome_says_so ... FAILED / thread 'an_operator_key_signs_as_worker_and_the_outcome_says_so' (9624438) panicked at tests/tests/hardening.rs:158:88: / test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 58.28s | test an_operator_key_signs_as_worker_and_the_outcome_says_so ... ok / test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 80.48s | KILLED |
 | M53 | reputation: a recorded default lowers the credit line | `contract/src/rules.rs` | `reputation::pell_credit_line_reflects_marta_default` | test pell_credit_line_reflects_marta_default ... FAILED / thread 'pell_credit_line_reflects_marta_default' panicked at tests/tests/reputation.rs:39:5: / left: Number(20) / right: Number(15) / test result: FAILED. 0 passed; 1 failed | test pell_credit_line_reflects_marta_default ... ok / test result: ok. 1 passed | KILLED |
 | M54 | reputation: the commit clamp uses the reputation line | `contract/src/lib.rs` | `reputation::pell_credit_line_reflects_marta_default` | test pell_credit_line_reflects_marta_default ... FAILED / thread 'pell_credit_line_reflects_marta_default' panicked at tests/tests/reputation.rs:49:5: / left: Number(8) / right: Number(6) / test result: FAILED. 0 passed; 1 failed | test pell_credit_line_reflects_marta_default ... ok / test result: ok. 1 passed | KILLED |
+| M55 | npc_resume_batch: the loan decision event is emitted only after the signature verifies | `contract/src/lib.rs` | `attestation::loan_proof_rejects_replay_tamper_cross_merchant_and_expired_payload` | thread 'loan_proof_rejects_replay_tamper_cross_merchant_and_expired_payload' panicked at tests/tests/attestation.rs:177:5: / no decision event on a tampered payload / test result: FAILED. 0 passed; 1 failed | test loan_proof_rejects_replay_tamper_cross_merchant_and_expired_payload ... ok / test result: ok. 1 passed; 0 failed | KILLED |
 
 ## Signer path checks (client side)
 

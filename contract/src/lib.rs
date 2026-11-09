@@ -399,6 +399,7 @@ impl Contract {
 
         let terms = attest::parse_batch(&response, batch.offer_ids.len());
         let mut quotes = Some((terms.buy_price, terms.sell_price));
+        let mut decided: Vec<u64> = vec![];
         for (slot, id) in batch.offer_ids.iter().enumerate() {
             let offer = self.offers.get(id).unwrap_or_else(|| env::panic_str("batched offer missing"));
             if offer.status != OfferStatus::Pending {
@@ -413,6 +414,7 @@ impl Contract {
             let payload = serde_json::to_vec(&resumed).unwrap_or_else(|_| env::panic_str("serialize"));
             require!(payload.len() < 1024, "term sheet exceeds the 1024 byte yield limit");
             let _ = UserYieldId::new(yield_id(&offer.player, offer.nonce)).resume(payload);
+            decided.push(*id);
         }
         let b = self.batches.get_mut(&batch_id).unwrap_or_else(|| env::panic_str("no such batch"));
         b.status = BatchStatus::Resolved;
@@ -421,6 +423,11 @@ impl Contract {
         b.response_hash = Hash32::from_hex(&response_hash);
         self.open_batches.remove(&batch_id);
         emit("batch_resumed", json!({"batch_id": batch_id, "response_hash": response_hash}));
+        // only reached once the signature verified: the proof a loan decision came from the registered signer
+        emit(
+            "loan_decision",
+            json!({"batch_id": batch_id, "merchant": batch.merchant, "offer_ids": decided, "signer": signer, "request_hash": batch.request_hash.to_hex(), "response_hash": response_hash}),
+        );
     }
 
     #[private]

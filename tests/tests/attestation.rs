@@ -141,3 +141,84 @@ async fn owner_methods_and_the_callback_are_closed_to_everyone_else() -> Result<
     assert!(cb.contains("Method on_terms is private") || cb.contains("private"), "{cb}");
     Ok(())
 }
+
+fn decision_events(logs: &[&str]) -> Vec<serde_json::Value> {
+    logs.iter()
+        .filter_map(|l| l.strip_prefix("EVENT_JSON:"))
+        .filter_map(|j| serde_json::from_str::<serde_json::Value>(j).ok())
+        .filter(|e| e["event"] == json!("loan_decision"))
+        .collect()
+}
+
+async fn pending_count(w: &World) -> Result<usize> {
+    Ok(w.view("pending_offers", json!({})).await?.as_array().unwrap().len())
+}
+
+#[tokio::test]
+async fn loan_proof_rejects_replay_tamper_cross_merchant_and_expired_payload() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let alice = w.player("alice").await?;
+    let bob = w.player("bob").await?;
+    let carol = w.player("carol").await?;
+    let oa = w.open_offer(&alice, 0, 5, 5, "alice pitch").await?;
+    let ob = w.open_offer(&bob, 1, 5, 5, "bob pitch").await?;
+    let (batch_a, body_a) = w.body_of(&oa).await?;
+    let (batch_b, body_b) = w.body_of(&ob).await?;
+    let content = batch_content(&[terms("accept", 5, 6, 3, "other")]);
+    let (resp_a, sig_a) = w.signed(&body_a, &content);
+    assert_eq!(pending_count(&w).await?, 2);
+
+    // one-byte tamper
+    let altered = resp_a.replacen("\"advance\\\":5", "\"advance\\\":9", 1);
+    assert_ne!(altered, resp_a, "the fixture must actually change a byte");
+    let r = w.relay(batch_a, &altered, &sig_a, "provider_tee").await?;
+    assert!(r.is_failure(), "tampered payload must fail");
+    assert!(failure_text(Ok::<_, String>(r.clone())).unwrap().contains("signature does not verify"));
+    assert!(decision_events(&r.logs()).is_empty(), "no decision event on a tampered payload");
+
+    // a payload signed for another merchant's request
+    let (resp_b, sig_b) = w.signed(&body_b, &content);
+    let r = w.relay(batch_a, &resp_b, &sig_b, "provider_tee").await?;
+    assert!(r.is_failure(), "cross-merchant payload must fail");
+    assert!(failure_text(Ok::<_, String>(r.clone())).unwrap().contains("signature does not verify"));
+    assert!(decision_events(&r.logs()).is_empty(), "no decision event on a cross-merchant payload");
+    assert_eq!(pending_count(&w).await?, 2, "both yields still open after the rejected payloads");
+
+    // the valid answer settles and emits exactly one decision event
+    let ok = w.relay(batch_a, &resp_a, &sig_a, "provider_tee").await?;
+    assert!(ok.is_success(), "{:?}", ok.failures());
+    let events = decision_events(&ok.logs());
+    assert_eq!(events.len(), 1, "{events:?}");
+    let d = &events[0]["data"];
+    assert_eq!(events[0]["standard"], json!("longcon"));
+    assert_eq!(d["batch_id"], json!(batch_a));
+    assert_eq!(d["merchant"], json!(0));
+    assert_eq!(d["offer_ids"], json!([oa.id]));
+    assert_eq!(d["signer"], json!(MODEL));
+    assert_eq!(d["request_hash"], json!(sha256_hex(&body_a)));
+    assert_eq!(d["response_hash"], json!(sha256_hex(&resp_a)));
+    assert_eq!(oa.status.await?.json::<serde_json::Value>()?["status"], json!("committed"));
+    assert_eq!(pending_count(&w).await?, 1, "only Bob's yield is left");
+
+    // replay of the settled payload
+    let r = w.relay(batch_a, &resp_a, &sig_a, "provider_tee").await?;
+    assert!(r.is_failure(), "replay must fail");
+    assert!(failure_text(Ok::<_, String>(r.clone())).unwrap().contains("not awaiting an answer"));
+    assert!(decision_events(&r.logs()).is_empty(), "no decision event on a replay");
+    assert_eq!(w.merchant(0).await?["outstanding"], json!(5), "no second debt");
+    assert_eq!(pending_count(&w).await?, 1);
+
+    // an answer that arrives after its offer expired
+    let oc = w.open_offer(&carol, 2, 5, 5, "carol pitch").await?;
+    let (batch_c, body_c) = w.body_of(&oc).await?;
+    let (resp_c, sig_c) = w.signed(&body_c, &content);
+    w.worker.fast_forward(260).await?;
+    assert_eq!(oc.status.await?.json::<serde_json::Value>()?["status"], json!("timed_out"));
+    let r = w.relay(batch_c, &resp_c, &sig_c, "provider_tee").await?;
+    assert!(r.is_failure(), "an expired payload must fail");
+    assert!(decision_events(&r.logs()).is_empty(), "no decision event on an expired payload");
+    assert_eq!(w.merchant(2).await?["outstanding"], json!(0));
+    assert_eq!(w.player_view(carol.id()).await?["gold"], json!(20), "the bond is back, nothing advanced");
+    w.audit().await?;
+    Ok(())
+}

@@ -35,7 +35,7 @@ if (mode === 'worker') {
   const nonce = crypto.getRandomValues(new Uint8Array(32));
   const hex = Array.from(nonce, (b) => b.toString(16).padStart(2, '0')).join('');
   const r = await fetch(`${base}/attestation/report?model=${encodeURIComponent(model)}&provider=near&signing_algo=ed25519&nonce=${hex}`, {
-    headers: { accept: 'application/json', 'x-no-aliasing': 'true', authorization: `Bearer ${env('LLM_API_KEY')}` },
+    headers: { accept: 'application/json', 'x-no-aliasing': 'true', ...(process.env.LLM_API_KEY && process.env.LLM_API_KEY !== 'none' ? { authorization: `Bearer ${process.env.LLM_API_KEY}` } : {}) },
   });
   if (!r.ok) throw new Error(`attestation report ${r.status}: ${(await r.text()).slice(0, 160)}`);
   const accepted = env('ATTEST_TCB_STATUSES', 'UpToDate').split(',').map((s) => s.trim());

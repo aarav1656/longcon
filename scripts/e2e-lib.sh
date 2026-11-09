@@ -22,7 +22,7 @@ for t in bhn python3 curl jq; do command -v "$t" >/dev/null || fail "missing too
 cat >"$TMP/serve.py" <<'PY'
 import http.server, os, re, sys
 INJ = (b"<script>window.__errs=[];"
-       b"addEventListener('error',function(e){__errs.push('error: '+e.message)});"
+       b"addEventListener('error',function(e){if(!/^[a-z-]+-extension:/.test(e.filename||''))__errs.push('error: '+e.message)});"
        b"addEventListener('unhandledrejection',function(e){__errs.push('rejection: '+(e.reason&&e.reason.message||e.reason))});"
        b"window.__relay=[];var _f=fetch;fetch=function(u,o){var p=_f.apply(this,arguments);if(/\\/(relay|activate)$/.test(String(u)))p.then(function(r){return r.clone().json()}).then(function(j){__relay.push(j)},function(){});return p}</script>")
 BASE = http.server.SimpleHTTPRequestHandler

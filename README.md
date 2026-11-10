@@ -40,6 +40,14 @@ Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `w
 
 The game and ledger default to `longcon4-game.testnet`. Set up that testnet road with step 5 before opening either page.
 
+## Cloudflare Pages
+
+After logging in to Cloudflare, build and deploy the playable client and its live finalized receipt activity:
+
+```sh
+cd web && bun run build && npx wrangler pages deploy dist --project-name longcon-near-hackathon
+```
+
 ## Ledger page
 
 `web/index.html` is a static page that reads the contract straight from the NEAR RPC: no build step, no packages, no server of ours. It shows what the contract holds and nothing else.

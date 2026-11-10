@@ -1,5 +1,6 @@
 import './style.css';
 import { Chain, Config, explain, identity, loadConfig } from './chain.ts';
+import { loadTraction, renderTraction } from './traction.ts';
 import { checkPitch, classLabel, classShort, clampSentence, esc, nextMove, newsArrives, shortId, STATUS_LABEL, txUrl, answeredLine, newsLines, sha256Hex, signatureValid } from './words.ts';
 
 interface Merchant { id: number; name: string; town: number; gold: number; grain: number; outstanding: number; buy_price: number; sell_price: number; lost_total: number; town_name: string; treasury_room: number; due_exposure: number[] }
@@ -71,6 +72,12 @@ function skeleton() {
         <li><b>Take the advance, end its due day, then one more.</b> See the debt default, your bond burn, and the con enter the ledger.</li>
         <li><b>Pitch the next town.</b> See its merchant carry the news into the answer.</li>
       </ol>
+    </section>
+    <section class="sec g12 traction" aria-label="live road activity">
+      <div class="head"><h2>the road's record</h2><button class="btn small" type="button" data-act="traction-refresh">Refresh</button></div>
+      <p class="label traction-stamp" id="traction-stamp" aria-live="polite">Reading finalized event receipts.</p>
+      <div class="traction-values" id="traction-values"><p class="empty">Reading finalized event receipts.</p></div>
+      <p class="err" id="traction-error" role="status"></p>
     </section>
     <section class="sec g12" aria-label="the road">
       <div class="head"><h2>the road</h2><span class="label" id="roadnote"></span></div>
@@ -320,6 +327,25 @@ function renderAll() {
   renderBar(); renderRoad(); renderMove(); renderVerdict(); renderMine(); renderLedger(); renderFoot(); syncForm();
 }
 
+async function refreshTraction() {
+  const stamp = $('#traction-stamp');
+  const error = $('#traction-error');
+  const button = $<HTMLButtonElement>('[data-act="traction-refresh"]');
+  button.disabled = true;
+  stamp.textContent = 'Reading finalized event receipts.';
+  error.textContent = '';
+  try {
+    const data = await loadTraction();
+    setHtml($('#traction-values'), renderTraction(data));
+    stamp.textContent = `${data.contract_id} · finalized through block ${data.finalized_height}`;
+  } catch (e: any) {
+    stamp.textContent = 'Finalized receipt read failed.';
+    error.textContent = `Could not read activity: ${String(e?.message ?? e).slice(0, 160)}`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function refresh() {
   try {
     const [s, p] = await Promise.all([chain.view<StateV>('state'), chain.view<PlayerV | null>('player', { account_id: chain.me.id })]);
@@ -413,6 +439,7 @@ app.addEventListener('click', (ev) => {
   const t = (ev.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
   if (!t) return;
   const a = t.dataset.act!;
+  if (a === 'traction-refresh') { void refreshTraction(); return; }
   if (a === 'pick' && (ev.target as HTMLElement).closest('input')) return;
   if (a === 'pick') {
     selected = Number(t.dataset.m);
@@ -462,6 +489,8 @@ async function boot() {
   } catch { attestation = null; }
   chain = new Chain(cfg, identity());
   skeleton();
+  void refreshTraction();
+  setInterval(() => { void refreshTraction(); }, 60_000);
   renderBar();
   await refresh();
   void onboard();

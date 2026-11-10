@@ -119,6 +119,16 @@
   .intro .steps { grid-column: 8 / -1; }
 }
 
+.traction { row-gap: var(--s3); }
+.traction-stamp { grid-column: 1 / -1; }
+.traction-values { grid-column: 1 / -1; }
+.traction-grid { display: grid; grid-template-columns: 1fr; gap: 0 var(--s6); }
+.traction-grid > div { border-top: 1px solid var(--color-ink); padding: var(--s3) var(--s2) var(--s4); }
+.traction-grid dt { color: var(--color-muted); font-size: 13px; font-weight: 600; }
+.traction-grid dd { margin: var(--s1) 0 0; font-size: clamp(36px, 6vw, 64px); font-weight: 800; line-height: 1; letter-spacing: -0.04em; }
+.traction #traction-error { grid-column: 1 / -1; }
+@media (min-width: 700px) { .traction-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
 /* sections */
 .sec { padding: var(--s8) 0 var(--s12); border-bottom: 2px solid var(--color-ink); }
 .sec > .head { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: var(--s4); padding-bottom: var(--s4); flex-wrap: wrap; }

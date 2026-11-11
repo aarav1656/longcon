@@ -16,17 +16,36 @@ export interface TractionEvent {
 
 const INDEXER = 'https://tx.test.fastnear.com';
 const RPC = 'https://rpc.testnet.fastnear.com';
+const RPC_FALLBACKS = ['https://rpc.testnet.near.org', 'https://near-testnet.drpc.org'];
 export const TRACTION_CONTRACT = 'longcon4-game.testnet';
 
 async function post<T>(url: string, body: unknown): Promise<T> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw new Error(`${url} returned ${response.status}`);
-  return response.json() as Promise<T>;
+  const candidates = url === RPC ? [RPC, ...RPC_FALLBACKS] : [url];
+  let lastRateLimit = 'rate limited';
+  for (let attempt = 0; attempt < 6; attempt++) {
+    for (const candidate of candidates) {
+      const response = await fetch(candidate, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (response.status === 429) {
+        lastRateLimit = `${candidate} returned HTTP 429`;
+        continue;
+      }
+      if (!response.ok) throw new Error(`${candidate} returned ${response.status}`);
+      const result = await response.json() as { error?: { code?: number; message?: string } } & T;
+      if (result.error?.code === -429) {
+        lastRateLimit = `${candidate} returned JSON-RPC -429`;
+        continue;
+      }
+      if (result.error) throw new Error(`${candidate} returned JSON-RPC error ${result.error.code ?? ''}: ${result.error.message ?? 'unknown error'}`);
+      return result;
+    }
+    if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
+  }
+  throw new Error(`rate limit persisted after six attempts: ${lastRateLimit}`);
 }
 
 function successful(outcome: any): boolean {

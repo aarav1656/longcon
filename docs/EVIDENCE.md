@@ -17,3 +17,17 @@
 | Step | Transaction | Hash | Block |
 |---|---|---|---|
 | J1 | join (sponsor_join via relayer) | `61zwNEjVMgNNxhkKjKL8pJbJLY4r6X1bTy9nqXxkhQe1` | 276766351 |
+## Long Con traction
+
+Playable page: https://near-longcon.pages.dev/game.html. Contract: `longcon4-game.testnet`.
+
+Read time: `2026-11-11T22:10:08.203Z`; finalized source height: `277274723`. Counters come from successful finalized contract receipts: pitches count distinct `offer_opened` events, loans count distinct `offer_settled` events with `status=committed` and positive advance, and defaults count distinct `con_landed` events. The hosted page API returned matching values.
+
+| Event / entity | Counted item | Transaction hash | Block height |
+|---|---:|---|---:|
+| Pitch | 1 | `6ZJPStDr3XwXbbJ9dpebAmaXTrL8BmJaRHaEbK1Eozbj` | 276765061 |
+| Committed loan | 2 | `4HryJRzGcrMh656EUeu9V4VRxAK1hfpFm4EK6yusBZDt` | 277080079 |
+| Default | 1 | `4QUApNn8ceGZ7JyyvkeiG8tcz29tg4D1qxM2F9azwCN2` | 277086422 |
+
+Counts at finalized height `277274723`: pitches `53`, loans `36`, defaults `36`.
+

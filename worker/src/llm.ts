@@ -43,7 +43,9 @@ export async function nearAiSignature(
         await sleep(700);
         continue;
       }
-      const kind: SigKind = j.signature_kind === 'gateway' ? 'gateway' : 'provider_tee';
+      if (j.signature_kind !== 'provider_tee' && j.signature_kind !== 'gateway') throw new Error('unsupported signature_kind');
+      if (j.signing_algo !== 'ed25519') throw new Error('unsupported signing_algo');
+      const kind: SigKind = j.signature_kind;
       if (j.text !== expected(kind)) throw new Error(`signed text ${String(j.text).slice(0, 90)} is not the hash of what we sent and received`);
       return { signature: String(j.signature).replace(/^0x/, ''), kind };
     }

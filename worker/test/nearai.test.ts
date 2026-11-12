@@ -24,15 +24,27 @@ test('a 2xx carrying error_code is not a signature: the poll continues until the
 }, 20000);
 
 test('a signature over text that is not our request and response hashes is refused', async () => {
-  globalThis.fetch = (async () => json({ text: signedText('provider_tee', cfg.model, sha256Hex('req'), sha256Hex('other')), signature: 'aa' })) as unknown as typeof fetch;
+  globalThis.fetch = (async () => json({ text: signedText('provider_tee', cfg.model, sha256Hex('req'), sha256Hex('other')), signature: 'aa', signature_kind: 'provider_tee', signing_algo: 'ed25519' })) as unknown as typeof fetch;
   await expect(nearAiSignature(cfg, 'chatcmpl-2', expected, Date.now() + 5000)).rejects.toThrow('not the hash of what we sent and received');
 });
 
-test('a gateway signed answer is matched against the gateway text shape', async () => {
-  const gw = signedText('gateway', cfg.model, sha256Hex('req'), sha256Hex('resp'));
-  globalThis.fetch = (async () => json({ text: gw, signature: 'cc', signature_kind: 'gateway' })) as unknown as typeof fetch;
-  const s = await nearAiSignature(cfg, 'chatcmpl-3', (k) => signedText(k, cfg.model, sha256Hex('req'), sha256Hex('resp')), Date.now() + 5000);
-  expect(s.kind).toBe('gateway');
+test('signature metadata rejects invalid values and accepts supported kinds', async () => {
+  for (const [metadata, error] of [
+    [{ signing_algo: 'ed25519' }, 'unsupported signature_kind'],
+    [{ signature_kind: 'unknown', signing_algo: 'ed25519' }, 'unsupported signature_kind'],
+    [{ signature_kind: 'provider_tee' }, 'unsupported signing_algo'],
+    [{ signature_kind: 'gateway', signing_algo: 'ecdsa' }, 'unsupported signing_algo'],
+  ]) {
+    globalThis.fetch = (async () => json({ text, signature: 'aa', ...metadata })) as unknown as typeof fetch;
+    await expect(nearAiSignature(cfg, 'chatcmpl-invalid', expected, Date.now() + 5000)).rejects.toThrow(error);
+  }
+
+  for (const kind of ['provider_tee', 'gateway'] as const) {
+    const signed = signedText(kind, cfg.model, sha256Hex('req'), sha256Hex('resp'));
+    globalThis.fetch = (async () => json({ text: signed, signature: 'cc', signature_kind: kind, signing_algo: 'ed25519' })) as unknown as typeof fetch;
+    const result = await nearAiSignature(cfg, 'chatcmpl-valid', (k) => signedText(k, cfg.model, sha256Hex('req'), sha256Hex('resp')), Date.now() + 5000);
+    expect(result).toEqual({ signature: 'cc', kind });
+  }
 });
 
 test('the signer comes from signing_address of an ed25519 report, many instances of one model are one signer', () => {

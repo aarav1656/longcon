@@ -47,7 +47,7 @@ impl Contract {
         self.rumour_balances.insert((rec.player.clone(), id.clone()), bal + 1);
         let sup = self.rumour_supply.get(&id).copied().unwrap_or(0);
         self.rumour_supply.insert(id.clone(), sup + 1);
-        event("mt_mint", json!({"owner_id": rec.player, "token_ids": [id], "amounts": ["1"], "memo": format!("con record {}", rec.id)}));
+        event("mt_mint", json!({"owner_id": rec.player, "token_ids": [id], "amounts": ["1"]}));
         if let Some(row) = self.wanted.iter_mut().find(|w| w.0 == rec.class) {
             row.2 += 1;
         } else {

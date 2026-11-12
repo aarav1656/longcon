@@ -26,7 +26,7 @@ pub const TRADE_LINE_DIV: u64 = 10;
 pub const REP_HAIRCUT_PCT_PER_DEFAULT: u64 = 25;
 pub const REP_HAIRCUT_MAX_PCT: u64 = 75;
 /// Reputation changes per emitted event, so a day of mass defaults stays under the log limits.
-pub const REP_EVENT_CHUNK: usize = 16;
+pub const REP_EVENT_CHUNK: usize = 48;
 pub const REPAY_LINE_DIV: u64 = 2;
 pub const ON_TERMS_TGAS: u64 = 30;
 

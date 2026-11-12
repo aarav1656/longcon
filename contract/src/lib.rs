@@ -564,7 +564,7 @@ impl Contract {
                 response_hash: d.response_hash,
                 config_hash: d.config_hash,
             };
-            emit("con_landed", json!({"record_id": rec.id, "class": rec.class, "town": rec.town, "loss": rec.loss}));
+            emit("con_landed", json!({"record_id": rec.id, "player": rec.player, "debt_id": rec.debt_id, "bond_burned": rec.bond_burned, "class": rec.class, "town": rec.town, "loss": rec.loss}));
             reputation.push((d.player.clone(), p.cons_landed));
             self.mint_rumour(&rec);
             self.records.push(rec);

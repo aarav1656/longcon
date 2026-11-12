@@ -61,6 +61,33 @@ async fn a_default_burns_the_bond_books_the_loss_and_writes_a_con_record() -> Re
 }
 
 #[tokio::test]
+async fn con_landed_event_includes_player_debt_and_bond_burned() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let alice = w.player("alice").await?;
+    let out = w.play(&alice, 0, 8, 8, "caravan on day 4", &terms("accept", 8, 9, 1, "future_cargo")).await?;
+    assert_eq!(out["status"], json!("committed"));
+    w.advance_day(&alice).await?.into_result()?;
+    let landed = w.advance_day(&alice).await?.into_result()?;
+    let logs = landed.logs();
+    let event = logs.iter()
+        .find(|line| line.contains("\"event\":\"con_landed\""))
+        .expect("default receipt contains con_landed");
+    let event: Value = serde_json::from_str(event.strip_prefix("EVENT_JSON:").expect("NEP-297 event log"))?;
+    let record = &w.view("con_records", json!({"from": 0, "limit": 1})).await?[0];
+    assert_eq!(event["standard"], json!("longcon"));
+    assert_eq!(event["version"], json!("1.0.0"));
+    assert_eq!(event["data"]["record_id"], record["id"]);
+    assert_eq!(event["data"]["player"], alice.id().to_string());
+    assert_eq!(event["data"]["player"], record["player"]);
+    assert_eq!(event["data"]["debt_id"], record["debt_id"]);
+    assert_eq!(event["data"]["bond_burned"], record["bond_burned"]);
+    assert_eq!(event["data"]["class"], record["class"]);
+    assert_eq!(event["data"]["town"], record["town"]);
+    assert_eq!(event["data"]["loss"], record["loss"]);
+    Ok(())
+}
+
+#[tokio::test]
 async fn repaying_returns_the_bond_and_grows_the_credit_line() -> Result<()> {
     let w = World::new(Cfg::default()).await?;
     let a = w.player("alice").await?;

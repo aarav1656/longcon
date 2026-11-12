@@ -187,9 +187,10 @@ function renderRoad() {
     const bars = m.due_exposure.slice(0, 6);
     const nws = news[i] ?? [];
     return `
-    <article class="m ${i === selected ? 'on' : ''}" data-act="pick" data-m="${i}">
+    <article class="m ${i === selected ? 'on' : ''}">
       <p class="label">${esc(m.town_name)}, town ${m.town + 1} of 3</p>
       <h3>${esc(m.name)}</h3>
+      <button class="btn small" type="button" data-act="pick" data-m="${i}" aria-pressed="${i === selected}">Select ${esc(m.name)}</button>
       <p class="gold num">${m.gold}<small>gold in the strongbox</small></p>
       <dl class="kv">
         <dt>Grain in stock</dt><dd>${m.grain}</dd>
@@ -440,12 +441,9 @@ app.addEventListener('click', (ev) => {
   if (!t) return;
   const a = t.dataset.act!;
   if (a === 'traction-refresh') { void refreshTraction(); return; }
-  if (a === 'pick' && (ev.target as HTMLElement).closest('input')) return;
   if (a === 'pick') {
     selected = Number(t.dataset.m);
     renderRoad(); syncForm();
-    if ((ev.target as HTMLElement).closest('button,input')) return;
-    $('#pitchbox').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
     return;
   }
   if (a === 'starter') {

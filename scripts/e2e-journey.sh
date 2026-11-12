@@ -103,9 +103,8 @@ DAYS_DONE=0
 end_day_to() { # target day
   local target="$1" day
   while day="$(v state | jq -r .day)"; [ "$day" -lt "$target" ]; do
-    waitjs "!document.querySelector('[data-act=endday]').disabled" 90
-    click "[data-act=endday]"
-    waitjs "document.getElementById('bar').innerText.replace(/\\s+/g,' ').includes('Road day $((day + 1))') || ${day} < 0" 90
+    click_endday
+    wait_advanced_day $((day + 1))
   done
 }
 end_day_to $((DUE + 1))

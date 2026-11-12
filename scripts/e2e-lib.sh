@@ -73,6 +73,10 @@ waitjs() { # JS predicate, timeout seconds
   done
   fail "timeout waiting for: $1"
 }
+click_endday() {
+  waitjs "(function(){var b=document.querySelector('[data-act=endday]');return !!b && !b.disabled})()" 90
+  ev "document.querySelector('[data-act=endday]').click()" >/dev/null
+}
 eq() { [ "$2" = "$3" ] || fail "$1: page shows '$2', chain says '$3'"; pass "$1 = $2"; }
 nonempty() { [ -n "$2" ] && [ "$2" != null ] || fail "$1 is empty"; }
 assert_no_errors() {

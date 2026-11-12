@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>End day fixture</title></head>
+<body>
+  <p>Road day <span id="day">8</span></p>
+  <script>
+    window.contractDay = 8;
+    window.enddayClicks = 0;
+    window.enddayWasDisabled = false;
+    window.enddayInitiallyAbsent = !document.querySelector('[data-act=endday]');
+    setTimeout(function () {
+      var button = document.createElement('button');
+      button.dataset.act = 'endday';
+      button.textContent = 'End day';
+      button.disabled = true;
+      window.enddayWasDisabled = true;
+      button.addEventListener('click', function () {
+        window.enddayClicks += 1;
+        window.contractDay += 1;
+        document.getElementById('day').textContent = window.contractDay;
+        button.disabled = true;
+      });
+      document.body.appendChild(button);
+      setTimeout(function () { button.disabled = false; }, 800);
+    }, 2500);
+  </script>
+</body>
+</html>

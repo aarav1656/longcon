@@ -13,7 +13,7 @@
       button.dataset.act = 'endday';
       button.textContent = 'End day';
       button.disabled = true;
-      window.enddayWasDisabled = true;
+      window.enddayWasDisabled = button.disabled;
       button.addEventListener('click', function () {
         window.enddayClicks += 1;
         window.contractDay += 1;
@@ -21,8 +21,8 @@
         button.disabled = true;
       });
       document.body.appendChild(button);
-      setTimeout(function () { button.disabled = false; }, 800);
-    }, 2500);
+      setTimeout(function () { button.disabled = false; }, 15000);
+    }, 15000);
   </script>
 </body>
 </html>

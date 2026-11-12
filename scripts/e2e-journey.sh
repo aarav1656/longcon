@@ -21,6 +21,31 @@ STEP=""
 if [ "${1:-}" = --step ]; then STEP="${2:-}"; [ "$STEP" = J1 ] || { echo "usage: $0 [--step J1]" >&2; exit 2; }; fi
 v() { rpc_view "$RPC" "$C" "$1" "${2:-\{\}}"; }
 
+wait_day_ended() {
+  local state block deadline now
+  for _ in $(seq 90); do
+    state="$(v state)"
+    [ "$(jq -r .day_length_ms <<<"$state")" = 0 ] && return
+    block="$(rpc "$RPC" block '{"finality":"final"}')"
+    deadline="$(jq -r '(.day_started_ns|tonumber) + (.day_length_ms|tonumber * 1000000)' <<<"$state")"
+    now="$(jq -r '.header.timestamp_nanosec|tonumber' <<<"$block")"
+    [ "$now" -ge "$deadline" ] && return
+    sleep 2
+  done
+  fail "day $(( $(jq -r .day <<<"$state") )) did not end before its on-chain deadline"
+}
+
+wait_advanced_day() {
+  local target="$1" day
+  for _ in $(seq 60); do
+    day="$(v state | jq -r .day)"
+    [ "$day" -ge "$target" ] && break
+    sleep 2
+  done
+  [ "$day" -ge "$target" ] || fail "advance_day did not move the contract to day $target; page error: $(ev "document.getElementById('err')?.innerText||''" 2>/dev/null || echo unavailable)"
+  waitjs "(function(){var m=/road day\\s*(\\d+)/i.exec(document.getElementById('bar').innerText);return !!m && Number(m[1]) >= $target})()" 60
+}
+
 tx_final() { # step label hash signer -> polls to FINAL, asserts no failed receipt, appends an EVIDENCE row
   local step="$1" label="$2" h="$3" signer="$4" r st i
   [ -n "$h" ] && [ "$h" != null ] || fail "$label: no transaction hash"
@@ -61,6 +86,16 @@ if [ "$STEP" = J1 ]; then
   echo "PASS J1 browser onboarding on $C ($P)"
   exit 0
 fi
+
+for day in $(seq 1 "${E2E_PREP_DAYS:-0}"); do
+  BEFORE="$(v state | jq -r .day)"
+  wait_day_ended
+  click_endday
+  wait_advanced_day $((BEFORE + 1))
+  waitjs "window.__relay.some(function(x){return x.method==='advance_day' && x.tx})" 60
+  ADVANCE_TX="$(evj "window.__relay.filter(function(x){return x.method==='advance_day'})" | jq -r '.[-1].tx // empty')"
+  tx_final PREP "advance_day #$day before Marta" "$ADVANCE_TX" "$RELAYER_ACCOUNT"
+done
 
 # J2: Marta, honest starter
 pitch_and_wait() { # merchant index -> waits for a verdict whose request hash differs from the last one

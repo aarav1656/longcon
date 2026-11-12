@@ -4,7 +4,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WEB="${E2E_WEB:-$ROOT/web}"
-B=(bhn deepsurge)
+BHN_COMMAND="${E2E_BHN_COMMAND:-bhn}"
+B=("$BHN_COMMAND" "${E2E_BHN_PROFILE:-deepsurge}")
 TMP="$(mktemp -d)"
 PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])')"
 TAB=""
@@ -17,14 +18,15 @@ cleanup() {
 trap cleanup EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
-for t in bhn python3 curl jq; do command -v "$t" >/dev/null || fail "missing tool: $t"; done
+command -v "$BHN_COMMAND" >/dev/null || fail "missing browser tool: $BHN_COMMAND"
+for t in python3 curl jq; do command -v "$t" >/dev/null || fail "missing tool: $t"; done
 
 cat >"$TMP/serve.py" <<'PY'
 import http.server, os, re, sys
 INJ = (b"<script>window.__errs=[];"
        b"addEventListener('error',function(e){if(!/^[a-z-]+-extension:/.test(e.filename||''))__errs.push('error: '+e.message)});"
        b"addEventListener('unhandledrejection',function(e){__errs.push('rejection: '+(e.reason&&e.reason.message||e.reason))});"
-       b"window.__relay=[];var _f=fetch;fetch=function(u,o){var p=_f.apply(this,arguments);if(/\\/(relay|activate)$/.test(String(u)))p.then(function(r){return r.clone().json()}).then(function(j){__relay.push(j)},function(){});return p}</script>")
+       b"window.__relay=JSON.parse(sessionStorage.getItem('__longconE2ERelay')||'[]');var _f=fetch;fetch=function(u,o){var p=_f.apply(this,arguments);if(/\\/(relay|activate)$/.test(String(u)))p.then(function(r){return r.clone().json()}).then(function(j){var x={};if(typeof j.method==='string')x.method=j.method;if(typeof j.tx==='string')x.tx=j.tx;if(typeof j.created==='boolean')x.created=j.created;if(x.tx||typeof x.created==='boolean'){__relay.push(x);sessionStorage.setItem('__longconE2ERelay',JSON.stringify(__relay))}},function(){});return p}</script>")
 BASE = http.server.SimpleHTTPRequestHandler
 if os.environ.get("E2E_BASE_HANDLER"):  # a repo's own server module with a Handler class (e.g. an API proxy)
     sys.path.insert(0, sys.argv[2]); BASE = __import__(os.environ["E2E_BASE_HANDLER"]).Handler

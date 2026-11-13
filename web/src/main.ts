@@ -491,7 +491,7 @@ function renderVerdict() {
   if (phase === 'refused') {
     setHtml(el, `<h3><span class="mk refused"></span>${esc(mn)} says no</h3>
       <p class="say2">${esc(mn)} filed it as ${esc(classLabel(oc.class))}. Your ${o.bond} gold bond is back in your purse.</p>
-      ${(news[o.merchant] ?? []).some((r) => r.class === oc.class) ? `<p class="fine">${esc(st?.merchants[o.merchant]?.town_name ?? 'This town')} has heard of ${esc(classLabel(oc.class))} cons on the road. A different kind of pitch gets a different answer.</p>` : ''}
+      ${(news[o.merchant] ?? []).some((r) => r.class === oc.class) ? `<p class="fine">${esc(st?.merchants[o.merchant]?.town_name ?? 'This town')} has heard a ${esc(classShort(oc.class))} con landed on the road. A different kind of pitch gets a different answer.</p>` : ''}
       <div class="actions"><button class="btn gold" type="button" data-act="again">Try another pitch</button></div>${seal(o, oc)}`);
     return;
   }
@@ -859,7 +859,7 @@ async function boot() {
   setInterval(() => { if (relay.kind === 'busy' && !ready) renderVerdict(); }, 1000);
   void onboard();
   await refresh();
-  setInterval(() => { void refresh(); }, pendingSince ? 1500 : 3000);
+  setInterval(() => { void refresh(); }, pendingSince ? 1500 : 5000);
   setInterval(() => { if (pv?.pending_offer) { seenKey = ''; void refresh(); } }, 1500);
 }
 

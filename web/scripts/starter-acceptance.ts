@@ -18,6 +18,7 @@ if (!(runs > 0) || !(ask > 0) || !(bond >= 0) || !pitch) {
 }
 const cfg: Config = await Bun.file(new URL('../public/config.json', import.meta.url)).json();
 if (cfg.relayer.startsWith('/')) cfg.relayer = (process.env.SITE ?? 'https://near-longcon.pages.dev') + cfg.relayer;
+if (process.env.RELAYER_URL) cfg.relayer = process.env.RELAYER_URL;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function one(i: number) {

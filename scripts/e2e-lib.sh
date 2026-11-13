@@ -84,18 +84,23 @@ open_page() { # path-with-query; opens a fresh tab, switches to it
   [ -n "$TAB" ] && [ "$TAB" != null ] || fail "tab did not open"
   "${B[@]}" use "$TAB" >/dev/null
 }
-# other agents share the profile and may switch the attached tab, so every call re-attaches to ours first
-goto_page() { "${B[@]}" use "$TAB" >/dev/null; "${B[@]}" goto "http://127.0.0.1:$PORT/$1" >/dev/null; }  # same tab, new document (fresh __errs)
-# `use` then `eval` are two calls and another agent can re-attach the shared profile in between, so the page
-# guards on its own port and the call retries until it ran in our tab.
+# Other agents share the profile and switch its attached tab at any moment, so `bhn use` + `bhn eval` can land in
+# their tab. Every eval goes straight to our tab over CDP (scripts/cdp-eval.ts) and never depends on the attached tab.
+CDP_PORT=""
+cdp_port() { [ -n "$CDP_PORT" ] || CDP_PORT="$("${B[@]}" status | grep -oE '\b9[0-9]{3}\b' | head -1)"; [ -n "$CDP_PORT" ] || fail "no CDP port for profile"; }
 ev() { # eval JS expression in our tab, raw value
   local out i
-  for i in $(seq 1 40); do
-    "${B[@]}" use "$TAB" >/dev/null
-    if out="$("${B[@]}" eval "(function(){if(location.port!=='$PORT')throw new Error('__wrongtab__');return ($1)})()" 2>&1)"; then jq -r '.value' <<<"$out"; return 0; fi
-    case "$out" in *__wrongtab__*) sleep "0.$((RANDOM % 6 + 2))";; *) printf '%s\n' "$out" >&2; return 1;; esac
+  cdp_port
+  for i in 1 2 3; do
+    if out="$(bun "$ROOT/scripts/cdp-eval.ts" "$CDP_PORT" "$TAB" "$1" 2>&1)"; then jq -r '.value' <<<"$out"; return 0; fi
+    case "$out" in *"page threw"*) break;; esac
+    sleep 0.5
   done
   printf '%s\n' "$out" >&2; return 1
+}
+goto_page() { # same tab, new document (fresh __errs); returns once the new document finished loading
+  ev "location.assign('http://127.0.0.1:$PORT/$1')" >/dev/null
+  waitjs "location.href === 'http://127.0.0.1:$PORT/$1' && document.readyState === 'complete'" 30
 }
 evj() { ev "JSON.stringify($1)"; }                  # eval JS expr, JSON out
 waitjs() { # JS predicate, timeout seconds

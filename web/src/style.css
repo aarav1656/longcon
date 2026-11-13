@@ -559,6 +559,9 @@ h3 .num, .stamp span, .chip .v { font-family: var(--font); font-weight: 700; }
   .qclock { border-right: 0; border-bottom: 2px dashed var(--navy-3); padding: 4px 4px 8px; }
   .qclock .qt { font-size: 40px; }
   .qclock .qt.small { font-size: 16px; }
+  .qclock.open { grid-template-columns: auto auto 1fr; align-items: baseline; }
+  .qclock.open .qk { grid-column: auto; }
+  .qclock.open .qt { margin: 0 4px 0 8px; }
   .qmech { font-size: 13px; }
   .qmech b { font-size: 14px; }
   .qcards { grid-template-columns: minmax(0, 1fr); gap: 6px; }

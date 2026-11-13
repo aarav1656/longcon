@@ -586,7 +586,7 @@ function renderPitchGo() {
   const i = pitchTarget();
   const m = st?.merchants[i];
   const heardMe = !!m && !!st && myCons().some((r) => newsArrives(r.day, r.town, m.town) <= st!.day && r.town !== m.town);
-  $('#pitchgolabel').textContent = m && placed ? (heardMe ? `Pitch ${m.name} (has heard you)` : `Pitch ${m.name} gold`) : 'Pitch for gold';
+  $('#pitchgolabel').textContent = m && placed ? (heardMe ? `Ask ${m.name} (has heard you)` : `Ask ${m.name} for gold`) : 'Ask for gold';
   $('#pitchgo').parentElement!.hidden = relay.kind === 'closed' && !ready;
 }
 
@@ -626,6 +626,7 @@ function roundView(): RoundView {
     left: round.phase === 'open' ? sealIn(round.oldest, round.head, round.headAt, Date.now()) : 0,
     ranking: round.ranking,
     lossCap: st?.rules.loss_cap_per_day ?? 15,
+    strongbox: m?.gold ?? null,
     me: chain.me.id,
     mePitch: pitchEl?.value ?? STARTERS[0].text,
     meAsk: Number(document.querySelector<HTMLInputElement>('#ask')?.value) || STARTERS[0].ask,

@@ -510,6 +510,8 @@ h3 .num, .stamp span, .chip .v { font-family: var(--font); font-weight: 700; }
 .qbar i { display: block; height: 100%; background: var(--gold); transition: width 1s linear; }
 .qbar.run i { width: 30%; animation: qscan 1.1s linear infinite; }
 @keyframes qscan { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.qmech { margin: 0; font-size: 15px; line-height: 1.35; color: var(--cream-2); }
+.qmech b { color: var(--gold); font-size: 17px; }
 .qbody { min-width: 0; display: grid; gap: 8px; align-content: center; }
 .qcards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .qcard { background: var(--navy-2); box-shadow: 0 0 0 2px var(--ink); padding: 8px 10px 9px; min-height: 122px; display: grid; align-content: start; gap: 5px; min-width: 0; animation: qin .35s steps(4) both; }
@@ -557,6 +559,8 @@ h3 .num, .stamp span, .chip .v { font-family: var(--font); font-weight: 700; }
   .qclock { border-right: 0; border-bottom: 2px dashed var(--navy-3); padding: 4px 4px 8px; }
   .qclock .qt { font-size: 40px; }
   .qclock .qt.small { font-size: 16px; }
+  .qmech { font-size: 13px; }
+  .qmech b { font-size: 14px; }
   .qcards { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .qcard { min-height: 0; padding: 6px 8px 7px; }
   .qcard.idle { grid-column: auto; }

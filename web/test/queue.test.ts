@@ -19,3 +19,11 @@ test('while the rivals are being opened with no pitches yet the three rivals sho
   expect(html).toContain('Writing a pitch');
   expect(html).not.toContain('Open a round');
 });
+
+test('every phase of the queue states the stakes and the attested read above the pitches', () => {
+  for (const phase of ['opening', 'open', 'reading', 'settled'] as const) {
+    const html = queueHtml({ ...base, phase, strongbox: 1142, slots: phase === 'opening' ? [] : base.slots });
+    expect(html).toContain("strongbox 1142 gold");
+    expect(html).toContain('NEAR AI attested read ranks every pitch');
+  }
+});

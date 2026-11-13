@@ -68,6 +68,7 @@ export interface RoundView {
   left: number;
   ranking: Ranked[];
   lossCap: number;
+  strongbox?: number | null;
   me: string;
   mePitch: string;
   meAsk: number;
@@ -102,6 +103,11 @@ function drain(v: RoundView): string {
   return `<div class="qdrain" aria-label="The merchant's daily loss cap, spent down the list"><span class="qk">Loss cap ${cap} gold</span><span class="qtrack">${bars}${cut ? '<i class="cutmark"></i>' : ''}</span><span class="qk">${paid >= cap || cut ? 'spent' : `${Math.max(0, cap - paid)} left`}</span></div>`;
 }
 
+function mech(v: RoundView): string {
+  const box = v.strongbox != null ? `<b>${esc(v.merchantName)}'s strongbox ${v.strongbox} gold.</b> ` : '';
+  return `<p class="qmech">${box}One NEAR AI attested read ranks every pitch in the queue, and the purse pays down that list until the ${v.lossCap} gold loss cap.</p>`;
+}
+
 export function queueHtml(v: RoundView): string {
   const head = clockBlock(v);
   if (v.phase === 'settled' || (v.phase === 'reading' && v.ranking.length)) {
@@ -111,12 +117,12 @@ export function queueHtml(v: RoundView): string {
       const why = r.cut ? `Asked ${r.ask}. The daily loss cap ran out above this slot.` : r.reason;
       return `<li class="qrow ${w.kind} ${r.advance > 0 ? 'paid' : ''} ${r.cut ? 'cut' : ''}"><span class="qrank">${r.rank}</span><span class="qwho"><b>${esc(w.name)}</b><span class="qwhy">${esc(why)}${r.cls ? ` <em>${esc(classShort(r.cls))}</em>` : ''}</span></span>${verdict}</li>`;
     }).join('');
-    return `<section class="panel queue settled" aria-label="The queue, ranked">${head}<div class="qbody"><ol class="qrows">${rows}</ol>${drain(v)}${v.phase === 'settled' ? '<button class="btn small gold qnext" type="button" data-act="nextround">Next round</button>' : ''}${v.note ? `<p class="qnote">${esc(v.note)}</p>` : ''}</div></section>`;
+    return `<section class="panel queue settled" aria-label="The queue, ranked">${head}<div class="qbody">${mech(v)}<ol class="qrows">${rows}</ol>${drain(v)}${v.phase === 'settled' ? '<button class="btn small gold qnext" type="button" data-act="nextround">Next round</button>' : ''}${v.note ? `<p class="qnote">${esc(v.note)}</p>` : ''}</div></section>`;
   }
   if (v.seating || (v.phase === 'opening' && !v.slots.length)) {
     const rivals = ['Doran Vale', 'Wick the Pale', 'Sable Orrin'].map((n) => card(n, 'rival', '', 0)).join('');
     const you = card('You', 'me', v.mePitch, v.meAsk, '<span class="qtag live">Type over it, then press Pitch</span>');
-    return `<section class="panel queue opening" aria-label="The queue">${clockBlock({ ...v, phase: 'opening' })}<div class="qbody"><ol class="qcards">${rivals}${you}</ol></div></section>`;
+    return `<section class="panel queue opening" aria-label="The queue">${clockBlock({ ...v, phase: 'opening' })}<div class="qbody">${mech(v)}<ol class="qcards">${rivals}${you}</ol></div></section>`;
   }
   const cards = v.slots.filter((s) => s.player !== v.me).map((s) => {
     const w = whoIs(s.player, v.me);
@@ -126,6 +132,6 @@ export function queueHtml(v: RoundView): string {
   const sent = !!mine;
   const you = card('You', 'me', sent ? mine!.pitch : v.mePitch, sent ? mine!.ask : v.meAsk, sent ? '<span class="qtag">In the queue</span>' : v.phase === 'open' ? '<span class="qtag live">Type over it, then press Pitch</span>' : '');
   const empty = v.phase === 'none' ? '<li class="qcard idle"><p class="qp">Three rival grifters pitch each round. Open one and you are fourth in the queue.</p><button class="btn small gold" type="button" data-act="nextround">Open a round</button></li>' : '';
-  return `<section class="panel queue ${v.phase}" aria-label="The queue">${head}<div class="qbody"><ol class="qcards">${cards.join('')}${v.phase === 'none' ? empty : ''}${you}</ol>${v.note ? `<p class="qnote">${esc(v.note)}</p>` : ''}</div></section>`;
+  return `<section class="panel queue ${v.phase}" aria-label="The queue">${head}<div class="qbody">${mech(v)}<ol class="qcards">${cards.join('')}${v.phase === 'none' ? empty : ''}${you}</ol>${v.note ? `<p class="qnote">${esc(v.note)}</p>` : ''}</div></section>`;
 }
 

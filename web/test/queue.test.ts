@@ -27,3 +27,9 @@ test('every phase of the queue states the stakes and the attested read above the
     expect(html).toContain('NEAR AI attested read ranks every pitch');
   }
 });
+
+test('the settled headline matches the outcome: paid down only when a pitch was paid', () => {
+  const r = (advance: number) => ({ rank: 1, player: 'x', ask: 2, advance, reason: 'r', cls: '', cut: false });
+  expect(queueHtml({ ...base, phase: 'settled', ranking: [r(2)] as any })).toContain('Purse paid down the list');
+  expect(queueHtml({ ...base, phase: 'settled', ranking: [r(0)] as any })).toContain('Nobody paid');
+});

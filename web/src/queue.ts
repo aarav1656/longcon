@@ -90,7 +90,7 @@ export function clockBlock(v: RoundView): string {
     return `<div class="qclock open"><span class="qk">Seals in</span><b class="qt" data-tick="seal">${v.left}</b><span class="qs">s</span><span class="qbar"><i style="width:${pct}%"></i></span></div>`;
   }
   if (v.phase === 'reading') return `<div class="qclock reading"><span class="qk">Sealed</span><b class="qt small">${esc(v.merchantName)} reads all ${v.slots.length}</b><span class="qbar run"><i></i></span></div>`;
-  if (v.phase === 'settled') return `<div class="qclock settled"><span class="qk">Answered</span><b class="qt small">Purse paid down the list</b></div>`;
+  if (v.phase === 'settled') return `<div class="qclock settled"><span class="qk">Answered</span><b class="qt small">${v.ranking.some((r) => r.advance > 0) ? 'Purse paid down the list' : `Nobody paid, ${esc(v.merchantName)}'s purse holds`}</b></div>`;
   return `<div class="qclock"><span class="qk">${v.phase === 'opening' ? 'Rivals arriving' : 'Between rounds'}</span><b class="qt small">${v.phase === 'opening' ? 'Pitching the queue' : 'No round open'}</b></div>`;
 }
 

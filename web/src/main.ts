@@ -661,8 +661,8 @@ async function boot() {
   void refreshTraction();
   setInterval(() => { void refreshTraction(); }, 60_000);
   renderBar();
-  await refresh();
   void onboard();
+  await refresh();
   setInterval(() => { void refresh(); }, pendingSince ? 1500 : 3000);
   setInterval(() => { if (pv?.pending_offer) { seenKey = ''; void refresh(); } }, 1500);
 }

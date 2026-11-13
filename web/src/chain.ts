@@ -48,7 +48,7 @@ export class Chain {
   constructor(readonly cfg: Config, readonly me: Identity) {
     this.provider = new JsonRpcProvider({ url: cfg.rpc });
     // The primary testnet endpoint can rate-limit reads or reject browser CORS requests.
-    const alt = cfg.network === 'testnet' && cfg.rpc !== 'https://near-testnet.drpc.org' ? 'https://near-testnet.drpc.org' : '';
+    const alt = cfg.network === 'testnet' ? ['https://near-testnet.drpc.org', 'https://test.rpc.fastnear.com'].find((u) => u !== cfg.rpc) : '';
     this.fallback = alt ? new JsonRpcProvider({ url: alt }) : null;
   }
 

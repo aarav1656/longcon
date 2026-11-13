@@ -129,6 +129,7 @@ test('sealLine names the signer kind and never claims a failed check', () => {
   expect(sealLine('provider_tee', 'Qwen/Qwen3.8-27B', true)).toBe('Signed by Qwen3.8 model in sealed enclave. Checked in browser ✓');
   expect(sealLine('worker', 'm', true)).toContain('worker key');
   expect(sealLine('gateway', 'm', false)).toBe('The signature did not verify against the registered key.');
+  expect(sealLine('gateway', 'm', null)).toBe('Checking the signature in your browser...');
 });
 
 test('heardLine turns a request news line into a sentence', () => {

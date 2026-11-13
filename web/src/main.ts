@@ -395,14 +395,15 @@ function steps(done: number, s2 = '', s3 = ''): string {
 function seal(o: Offer, oc: Outcome): string {
   const p = proof(oc.signer);
   const lb = lastBatch;
-  const ok = !!lb && signatureValid(p.kind, oc.model, o.request_hash, lb.response_hash, lb.signature, p.registeredKey);
+  // null while the batch is not read yet or belongs to another answer: never show a failure for a read that has not happened
+  const ok = lb && lb.response_hash === oc.response_hash ? signatureValid(p.kind, oc.model, o.request_hash, lb.response_hash, lb.signature, p.registeredKey) : null;
   const capture = requestCaptures[String(o.id)];
   const requestCheck = capture?.match === true ? 'Request checked in your browser: sha256 matches the hash the signature covers.'
     : capture?.match === false ? 'Request bytes did not match the hash on chain.'
       : capture?.missed ? 'The answer came back before this page read the request.' : '';
   const keyLine = p.kind === 'worker' ? 'Worker key, not an attested key' : p.attested ? 'Registered signer key matches the published report' : 'Registered signer key does not match the published report';
   const hash = (label: string, h: string, attr: string) => `<p class="fine">${label} <code class="mono" ${attr}="${esc(h)}" title="${esc(h)}">${esc(shortId(h, 6, 4))}</code> <button class="copy" type="button" data-act="copy" data-v="${esc(h)}">${copied === h ? 'copied' : 'copy'}</button></p>`;
-  return `<p class="seal ${ok ? '' : 'bad'}">${esc(sealLine(p.kind, oc.model, ok))}</p>
+  return `<p class="seal ${ok === false ? 'bad' : ''}">${esc(sealLine(p.kind, oc.model, ok))}</p>
     <details class="how"><summary>How answer checked</summary>
       ${hash('Request hash', o.request_hash, 'data-request-hash')}${hash('Response hash', oc.response_hash, 'data-response-hash')}
       <p class="fine">${esc(keyLine)}</p>
@@ -490,6 +491,7 @@ function renderVerdict() {
   if (phase === 'refused') {
     setHtml(el, `<h3><span class="mk refused"></span>${esc(mn)} says no</h3>
       <p class="say2">${esc(mn)} filed it as ${esc(classLabel(oc.class))}. Your ${o.bond} gold bond is back in your purse.</p>
+      ${(news[o.merchant] ?? []).some((r) => r.class === oc.class) ? `<p class="fine">${esc(st?.merchants[o.merchant]?.town_name ?? 'This town')} has heard of ${esc(classLabel(oc.class))} cons on the road. A different kind of pitch gets a different answer.</p>` : ''}
       <div class="actions"><button class="btn gold" type="button" data-act="again">Try another pitch</button></div>${seal(o, oc)}`);
     return;
   }
@@ -673,6 +675,7 @@ async function refresh() {
       if (!talking && quiet !== selected) { selected = quiet; world?.standAt(quiet); }
       if (wantTalk) { wantTalk = false; renderPitchGo(); world?.walkTo(selected); }
     }
+    if (last?.batch && last.outcome && lastBatch?.response_hash !== last.outcome.response_hash) lastBatch = await chain.view<BatchV>('batch', { batch_id: last.batch });
     await captureRequest();
   } catch {
     // keep what was last read; the next tick reads again and the page never prints a transport error

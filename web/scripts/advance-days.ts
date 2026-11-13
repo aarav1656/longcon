@@ -4,6 +4,7 @@ import { Chain, type Config } from '../src/chain.ts';
 
 const n = Number(process.argv[2] ?? 1);
 const cfg: Config = await Bun.file(new URL('../public/config.json', import.meta.url)).json();
+if (cfg.relayer.startsWith('/')) cfg.relayer = (process.env.SITE ?? 'https://near-longcon.pages.dev') + cfg.relayer;
 const kp = KeyPair.fromRandom('ed25519');
 const id = Array.from(kp.getPublicKey().data, (x) => x.toString(16).padStart(2, '0')).join('');
 const chain = new Chain(cfg, { id, kp });

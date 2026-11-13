@@ -199,7 +199,8 @@ export function travelStops(landDay: number, origin: number, towns: string[], to
 export const conLandDay = (dueDay: number): number => dueDay + 1;
 
 /** One line under a settled answer: who signed and that the browser checked it. */
-export function sealLine(kind: string, model: string, signatureOk: boolean): string {
+export function sealLine(kind: string, model: string, signatureOk: boolean | null): string {
+  if (signatureOk === null) return 'Checking the signature in your browser...';
   if (!signatureOk) return 'The signature did not verify against the registered key.';
   const who = kind === 'gateway' ? 'the NEAR AI gateway enclave' : kind === 'worker' ? "the operator's worker key" : `${modelShort(model)} model in sealed enclave`;
   return `Signed by ${who}. Checked in browser ✓`;

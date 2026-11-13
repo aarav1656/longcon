@@ -23,7 +23,7 @@ command -v "$BHN_COMMAND" >/dev/null || fail "missing browser tool: $BHN_COMMAND
 for t in python3 curl jq; do command -v "$t" >/dev/null || fail "missing tool: $t"; done
 
 cat >"$TMP/serve.py" <<'PY'
-import http.server, os, re, subprocess, sys
+import http.server, os, re, subprocess, sys, urllib.request
 INJ = (b"<script>window.__errs=[];"
        b"addEventListener('error',function(e){if(!/^[a-z-]+-extension:/.test(e.filename||''))__errs.push('error: '+e.message)});"
        b"addEventListener('unhandledrejection',function(e){__errs.push('rejection: '+(e.reason&&e.reason.message||e.reason))});"
@@ -35,6 +35,20 @@ class H(BASE):
     def log_message(self, *a): pass
     def end_headers(self):
         self.send_header("Cache-Control", "no-store"); super().end_headers()
+    def do_POST(self):
+        if self.path.split("?")[0] != "/api/rpc": self.send_error(404); return
+        body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        out = None
+        for u in os.environ.get("E2E_RPC_POOL", "https://near-testnet.drpc.org https://rpc.testnet.near.org https://test.rpc.fastnear.com").split():
+            try:
+                with urllib.request.urlopen(urllib.request.Request(u, body, {"content-type": "application/json"}), timeout=45) as r:
+                    t = r.read()
+            except Exception: continue
+            if re.search(rb'"code"\s*:\s*-?(429|32011|15)\b', t[:600]) and b'"result"' not in t[:600]: continue
+            out = t; break
+        if out is None: out = b'{"jsonrpc":"2.0","id":null,"error":{"code":-32011,"message":"rate limit: every upstream node is busy"}}'
+        self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(out)))
+        self.end_headers(); self.wfile.write(out)
     def do_GET(self):
         if self.path.startswith(os.environ.get("E2E_PASS_PREFIX", "\0")): return super().do_GET()
         if self.path.startswith("/api/traction?"):
@@ -72,7 +86,17 @@ open_page() { # path-with-query; opens a fresh tab, switches to it
 }
 # other agents share the profile and may switch the attached tab, so every call re-attaches to ours first
 goto_page() { "${B[@]}" use "$TAB" >/dev/null; "${B[@]}" goto "http://127.0.0.1:$PORT/$1" >/dev/null; }  # same tab, new document (fresh __errs)
-ev() { "${B[@]}" use "$TAB" >/dev/null; "${B[@]}" eval "$1" | jq -r '.value'; }      # eval JS, raw value
+# `use` then `eval` are two calls and another agent can re-attach the shared profile in between, so the page
+# guards on its own port and the call retries until it ran in our tab.
+ev() { # eval JS expression in our tab, raw value
+  local out i
+  for i in 1 2 3 4 5 6 7 8; do
+    "${B[@]}" use "$TAB" >/dev/null
+    if out="$("${B[@]}" eval "(function(){if(location.port!=='$PORT')throw new Error('__wrongtab__');return ($1)})()" 2>&1)"; then jq -r '.value' <<<"$out"; return 0; fi
+    case "$out" in *__wrongtab__*) sleep 0.3;; *) printf '%s\n' "$out" >&2; return 1;; esac
+  done
+  printf '%s\n' "$out" >&2; return 1
+}
 evj() { ev "JSON.stringify($1)"; }                  # eval JS expr, JSON out
 waitjs() { # JS predicate, timeout seconds
   local end=$((SECONDS + ${2:-60})) last_error='none' value

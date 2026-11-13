@@ -44,30 +44,48 @@ export const GAS: Record<string, bigint> = {
 
 export class Chain {
   readonly provider: JsonRpcProvider;
+  private readonly fallback: JsonRpcProvider | null;
   constructor(readonly cfg: Config, readonly me: Identity) {
     this.provider = new JsonRpcProvider({ url: cfg.rpc });
+    // The primary testnet endpoint can rate-limit reads or reject browser CORS requests.
+    const alt = cfg.network === 'testnet' && cfg.rpc !== 'https://near-testnet.drpc.org' ? 'https://near-testnet.drpc.org' : '';
+    this.fallback = alt ? new JsonRpcProvider({ url: alt }) : null;
+  }
+
+  private async rpc<T>(read: (provider: JsonRpcProvider) => Promise<T>): Promise<T> {
+    const pauses = [1000, 2000, 4000, 8000];
+    const call = (provider: JsonRpcProvider) => {
+      let timer: ReturnType<typeof setTimeout>;
+      return Promise.race([
+        read(provider),
+        new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error('RPC request timed out')), 10_000); }),
+      ]).finally(() => clearTimeout(timer));
+    };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        try { return await call(this.provider); }
+        catch (e) {
+          if (!this.fallback || !/429|-32011|timed out|failed to fetch|networkerror|load failed/i.test(String(e))) throw e;
+          return await call(this.fallback);
+        }
+      } catch (e) {
+        if (!/429/.test(String(e)) || attempt === pauses.length) throw e;
+        await new Promise((resolve) => setTimeout(resolve, pauses[attempt]));
+      }
+    }
   }
 
   view<T = any>(method: string, args: Record<string, unknown> = {}): Promise<T> {
-    const pauses = [1000, 2000, 4000, 8000];
-    const read = () => this.provider.callFunction({ contractId: this.cfg.contract_id, method, args }) as Promise<T>;
-    return (async () => {
-      for (let attempt = 0; ; attempt++) {
-        try { return await read(); }
-        catch (e) {
-          if (!/429/.test(String(e)) || attempt === pauses.length) throw e;
-          await new Promise((resolve) => setTimeout(resolve, pauses[attempt]));
-        }
-      }
-    })();
+    return this.rpc((provider) => provider.callFunction({ contractId: this.cfg.contract_id, method, args }) as Promise<T>);
   }
 
   async accountExists(): Promise<boolean> {
     try {
-      await this.provider.viewAccount({ accountId: this.me.id });
+      await this.rpc((provider) => provider.viewAccount({ accountId: this.me.id }));
       return true;
-    } catch {
-      return false;
+    } catch (e) {
+      if (/does not exist|unknown_account|accountdoesnotexist/i.test(String(e))) return false;
+      throw e;
     }
   }
 
@@ -92,8 +110,10 @@ export class Chain {
   /** Sign one function call as a NEP-366 delegate and let the relayer pay for it. */
   async send(method: string, args: Record<string, unknown>): Promise<{ tx?: string }> {
     const pk = this.me.kp.getPublicKey();
-    const key = await this.provider.viewAccessKey({ accountId: this.me.id, publicKey: pk.toString() });
-    const block = await this.provider.viewBlock({ finality: 'final' });
+    const [key, block] = await Promise.all([
+      this.rpc((provider) => provider.viewAccessKey({ accountId: this.me.id, publicKey: pk.toString() })),
+      this.rpc((provider) => provider.viewBlock({ finality: 'final' })),
+    ]);
     const da = buildDelegateAction({
       senderId: this.me.id,
       receiverId: this.cfg.contract_id,

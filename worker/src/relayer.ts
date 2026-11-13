@@ -78,8 +78,9 @@ Bun.serve({
         if (!/^[0-9a-f]{64}$/.test(account_id)) return json({ error: 'activate takes a 64 hex implicit account' }, 400);
         if (await exists(account_id)) return json({ ok: true, created: false });
         if (!activationBudget.take(who)) return json({ error: 'activation limit reached for now' }, 429);
-        await relayer.transfer({ receiverId: account_id, amount: ACTIVATION });
-        return json({ ok: true, created: true });
+        const res: any = await relayer.transfer({ receiverId: account_id, amount: ACTIVATION });
+        const tx = res?.transaction?.hash ?? res?.transactionOutcome?.id ?? res?.transaction_outcome?.id;
+        return json({ ok: true, created: true, tx });
       }
       if (url.pathname === '/relay' && req.method === 'POST') {
         const { signed_delegate } = (await req.json()) as { signed_delegate: string };

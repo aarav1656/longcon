@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WEB="${E2E_WEB:-$ROOT/web}"
 BHN_COMMAND="${E2E_BHN_COMMAND:-bhn}"
 B=("$BHN_COMMAND" "${E2E_BHN_PROFILE:-deepsurge}")
+export BH_TAB_SESSION="${BH_TAB_SESSION:-longcon-e2e-$$}"
 TMP="$(mktemp -d)"
 PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])')"
 TAB=""
@@ -22,7 +23,7 @@ command -v "$BHN_COMMAND" >/dev/null || fail "missing browser tool: $BHN_COMMAND
 for t in python3 curl jq; do command -v "$t" >/dev/null || fail "missing tool: $t"; done
 
 cat >"$TMP/serve.py" <<'PY'
-import http.server, os, re, sys
+import http.server, os, re, subprocess, sys
 INJ = (b"<script>window.__errs=[];"
        b"addEventListener('error',function(e){if(!/^[a-z-]+-extension:/.test(e.filename||''))__errs.push('error: '+e.message)});"
        b"addEventListener('unhandledrejection',function(e){__errs.push('rejection: '+(e.reason&&e.reason.message||e.reason))});"
@@ -36,6 +37,13 @@ class H(BASE):
         self.send_header("Cache-Control", "no-store"); super().end_headers()
     def do_GET(self):
         if self.path.startswith(os.environ.get("E2E_PASS_PREFIX", "\0")): return super().do_GET()
+        if self.path.startswith("/api/traction?"):
+            contract = os.environ.get("E2E_GAME", "longcon4-game.testnet")
+            run = subprocess.run(["bun", os.environ["E2E_TRACTION_SCRIPT"], contract], capture_output=True, text=True, timeout=60)
+            body = run.stdout.encode() if run.returncode == 0 else run.stderr.encode()
+            self.send_response(200 if run.returncode == 0 else 502)
+            self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(body)))
+            self.end_headers(); self.wfile.write(body); return
         p = self.translate_path(self.path.split("?")[0].split("#")[0])
         if os.path.isdir(p): p = os.path.join(p, "index.html")
         if p.endswith(".html") and os.path.isfile(p):
@@ -50,6 +58,7 @@ os.chdir(sys.argv[2])
 http.server.ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 PY
 start_server() { # optional env first: E2E_BASE_HANDLER=<module in web/> E2E_PASS_PREFIX=<path prefix the handler owns>
+  export E2E_TRACTION_SCRIPT="$ROOT/web/scripts/traction-data.ts"
   python3 "$TMP/serve.py" "$PORT" "$WEB" & SRV=$!
   for _ in $(seq 50); do curl -sf "http://127.0.0.1:$PORT/" >/dev/null && break; sleep 0.1; done
   curl -sf "http://127.0.0.1:$PORT/" >/dev/null || fail "local server did not start"
@@ -66,18 +75,18 @@ goto_page() { "${B[@]}" use "$TAB" >/dev/null; "${B[@]}" goto "http://127.0.0.1:
 ev() { "${B[@]}" use "$TAB" >/dev/null; "${B[@]}" eval "$1" | jq -r '.value'; }      # eval JS, raw value
 evj() { ev "JSON.stringify($1)"; }                  # eval JS expr, JSON out
 waitjs() { # JS predicate, timeout seconds
-  local end=$((SECONDS + ${2:-60}))
+  local end=$((SECONDS + ${2:-60})) last_error='none' value
   while [ "$SECONDS" -lt "$end" ]; do
-    [ "$(ev "!!($1)" 2>/dev/null || true)" = true ] && return 0
-    sleep 1
+    if value="$(ev "!!($1)" 2>&1)"; then [ "$value" = true ] && return 0; else last_error="$value"; fi
+    sleep 2
   done
-  fail "timeout waiting for: $1"
+  fail "timeout waiting for: $1; browser error: $last_error; page state: $(ev "JSON.stringify({bar:document.getElementById('bar')?.innerText,move:document.getElementById('move')?.innerText,error:document.getElementById('err')?.innerText,pitch:document.getElementById('pitch')?.value,sendDisabled:document.getElementById('send')?.disabled})" 2>/dev/null || echo unavailable)"
 }
 click_endday() {
   waitjs "(function(){var b=document.querySelector('[data-act=endday]');return !!b && !b.disabled})()" 90
   ev "document.querySelector('[data-act=endday]').click()" >/dev/null
 }
-eq() { [ "$2" = "$3" ] || fail "$1: page shows '$2', chain says '$3'"; pass "$1 = $2"; }
+eq() { [ -n "$2" ] && [ "$2" = "$3" ] || fail "$1: page shows '$2', chain says '$3'"; pass "$1 = $2"; }
 nonempty() { [ -n "$2" ] && [ "$2" != null ] || fail "$1 is empty"; }
 assert_no_errors() {
   local e; e="$(ev "JSON.stringify(window.__errs||['__errs missing'])")"
@@ -89,8 +98,8 @@ RPC_FALLBACKS="${E2E_RPC_FALLBACKS:-https://rpc.testnet.near.org https://near-te
 rpc_call() { # rpc_url body -> first response that is not rate limited
   local u r
   for u in "$1" $RPC_FALLBACKS; do
-    r="$(curl -s -m 20 -X POST "$u" -H 'content-type: application/json' -d "$2")" || continue
-    case "$r" in ''|*'"code":-429'*|*'"code": -429'*) continue;; esac
+    r="$(curl -fsS -m 45 -X POST "$u" -H 'content-type: application/json' -d "$2")" || continue
+    case "$r" in ''|*'"code":-429'*|*'"code": -429'*|*'"code":-32011'*|*'"code": -32011'*) continue;; esac
     printf %s "$r"; return 0
   done
   return 1
@@ -99,11 +108,14 @@ rpc_view() { # rpc_url contract method args-json -> JSON result on stdout
   local body i
   body="$(jq -nc --arg a "$2" --arg m "$3" --arg g "$(printf %s "$4" | base64 | tr -d '\n')" \
     '{jsonrpc:"2.0",id:1,method:"query",params:{request_type:"call_function",finality:"final",account_id:$a,method_name:$m,args_base64:$g}}')"
-  for i in 1 2 3 4; do
+  for i in 1 2 3 4 5 6; do
     if rpc_call "$1" "$body" \
       | python3 -c 'import sys,json;r=json.load(sys.stdin);assert "error" not in r and "error" not in r["result"],r;sys.stdout.write(bytes(r["result"]["result"]).decode())' 2>/dev/null; then return 0; fi
-    sleep 2
+    sleep "$((i * 5))"
   done
+  sleep 30
+  if rpc_call "$1" "$body" \
+    | python3 -c 'import sys,json;r=json.load(sys.stdin);assert "error" not in r and "error" not in r["result"],r;sys.stdout.write(bytes(r["result"]["result"]).decode())' 2>/dev/null; then return 0; fi
   fail "rpc view $2.$3 failed on $1"
 }
 rpc() { # rpc_url method params-json -> .result JSON

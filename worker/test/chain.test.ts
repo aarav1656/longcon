@@ -18,6 +18,13 @@ test('a JSON-RPC -429 inside an HTTP 200 is asked again until the node answers',
   expect(JSON.parse(body).result.ok).toBe(true);
 }, 20000);
 
+test('drpc\'s HTTP 200 code 15 "rate limit" body is asked again too', async () => {
+  const drpc = () => new Response('{"id":"124","jsonrpc":"2.0","error":{"message":"You reached Public endpoint rate limit, please upgrade to paid plan","code":15}}', { status: 200 });
+  const { body, calls } = await withFakeRpc([drpc, fine]);
+  expect(calls).toBe(2);
+  expect(JSON.parse(body).result.ok).toBe(true);
+}, 20000);
+
 test('a real JSON-RPC error that is not a rate limit is returned at once', async () => {
   const { body, calls } = await withFakeRpc([() => new Response('{"jsonrpc":"2.0","id":"1","error":{"code":-32000,"message":"Server error"}}', { status: 200 })]);
   expect(calls).toBe(1);

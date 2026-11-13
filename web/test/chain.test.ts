@@ -43,6 +43,14 @@ test('view moves to the fallback node when the browser cannot fetch the primary 
   expect(await chain.view('state')).toEqual({ day: 8 });
 });
 
+test('view moves to the fallback node on drpc\'s HTTP 200 rate-limit body (code 15, no 429 in it)', async () => {
+  const chain = new Chain({ contract_id: 'road.testnet', network: 'testnet', rpc: 'https://near-testnet.drpc.org', relayer: '', explorer: '' }, { id: 'player', kp: KeyPair.fromRandom('ed25519') });
+  const fallback = (chain as unknown as { fallback: { callFunction: unknown } }).fallback;
+  Object.defineProperty(chain.provider, 'callFunction', { value: async () => { throw new Error('{"id":"124","jsonrpc":"2.0","error":{"message":"You reached Public endpoint rate limit, please upgrade to paid plan","code":15}}'); } });
+  Object.defineProperty(fallback, 'callFunction', { value: async () => ({ day: 10 }) });
+  expect(await chain.view('state')).toEqual({ day: 10 });
+});
+
 test('the shipped config, which reads drpc first, still gets a second node', async () => {
   const shipped = await Bun.file(new URL('../public/config.json', import.meta.url)).json();
   const chain = new Chain(shipped, { id: 'player', kp: KeyPair.fromRandom('ed25519') });

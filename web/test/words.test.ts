@@ -84,3 +84,31 @@ test('txUrl joins the explorer and the hash without doubling the slash', () => {
   expect(txUrl('https://testnet.nearblocks.io/', 'AbC')).toBe('https://testnet.nearblocks.io/txns/AbC');
   expect(txUrl('https://testnet.nearblocks.io', 'AbC')).toBe('https://testnet.nearblocks.io/txns/AbC');
 });
+
+import { purseLines, tickerLine, relayRetry } from '../src/words.ts';
+
+test('the purse chip never prints a dash: account, then stipend waiting, then a skeleton', () => {
+  const p = { gold: 15, locked_bonds: 5, earned_line: 0, debts: [{ merchant: 0, repay: 5, due_day: 149, status: 'open' }, { merchant: 1, repay: 9, due_day: 150, status: 'repaid' }] };
+  expect(purseLines(20, p, ['Marta', 'Pell'])).toEqual({ main: '15 gold', sub: ['5 locked in bonds', 'owe Marta 5 · due end of day 149'] });
+  expect(purseLines(20, { ...p, locked_bonds: 0, debts: [] }, [])).toEqual({ main: '15 gold', sub: [] });
+  expect(purseLines(20, null, [])).toEqual({ main: '20 gold waiting', sub: [] });
+  expect(purseLines(null, null, [])).toBeNull();
+});
+
+test('the ticker names the newest con and the next town to hear it, or says none has landed', () => {
+  const towns = ['Millford', 'Pellgate', 'Oskmoor'], names = ['Marta', 'Pell', 'Osk'];
+  const r = { day: 147, town: 1, merchant: 1, class: 'sob_story', loss: 9, player: 'abc' };
+  expect(tickerLine(r, 36, 147, towns, names, 'me')).toBe('Day 147: a sob story con landed in Pellgate. Pell lost 9 gold. Millford hears it on day 148.');
+  expect(tickerLine(r, 36, 150, towns, names, 'me')).toBe('Day 147: a sob story con landed in Pellgate. Pell lost 9 gold.');
+  expect(tickerLine({ ...r, town: 0, player: 'me' }, 36, 147, towns, names, 'me')).toBe('Your con landed in Millford. Pellgate hears it on day 148.');
+  expect(tickerLine(null, 0, 1, towns, names, 'me')).toContain('No con has landed');
+  expect(tickerLine(null, 36, 1, towns, names, 'me')).toBeNull();
+});
+
+test('a busy relay retries at 10, 20, 40 s and an unreachable one closes the table on the third try', () => {
+  expect(relayRetry('join limit reached for now', 0)).toEqual({ kind: 'busy', wait: 10 });
+  expect(relayRetry('activation limit reached for now', 5)).toEqual({ kind: 'busy', wait: 40 });
+  expect(relayRetry('TypeError: Failed to fetch', 1)).toEqual({ kind: 'busy', wait: 20 });
+  expect(relayRetry('TypeError: Failed to fetch', 2).kind).toBe('closed');
+  expect(relayRetry('activate 502', 2).kind).toBe('closed');
+});

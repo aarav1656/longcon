@@ -145,3 +145,40 @@ export function answeredLine(ms: number): string {
 
 /** Explorer page for a transaction the relayer submitted for the player. */
 export const txUrl = (explorer: string, tx: string): string => `${explorer.replace(/\/+$/, '')}/txns/${tx}`;
+
+/** The HUD purse chip, most certain value first: the account read, then the stipend a new account receives, then nothing (the page shows a skeleton). */
+export function purseLines(
+  stipend: number | null,
+  p: { gold: number; locked_bonds: number; earned_line: number; debts: { merchant: number; repay: number; due_day: number; status: string }[] } | null,
+  names: string[],
+): { main: string; sub: string[] } | null {
+  if (p) {
+    const sub: string[] = [];
+    if (p.locked_bonds > 0) sub.push(`${p.locked_bonds} locked in bonds`);
+    if (p.earned_line > 0) sub.push(`credit ${p.earned_line}`);
+    const due = p.debts.filter((d) => d.status === 'open').sort((a, b) => a.due_day - b.due_day)[0];
+    if (due) sub.push(`owe ${names[due.merchant] ?? 'the road'} ${due.repay} · due end of day ${due.due_day}`);
+    return { main: `${p.gold} gold`, sub };
+  }
+  return stipend === null ? null : { main: `${stipend} gold waiting`, sub: [] };
+}
+
+const conPhrase = (c: string): string => (c === 'other' || !CLASS_SHORT[c] ? 'a new kind of con' : `a ${CLASS_SHORT[c]} con`);
+
+/** The news ticker from the newest con record. Null while records exist but have not been read yet. */
+export function tickerLine(
+  r: { day: number; town: number; merchant: number; class: string; loss: number; player: string } | null,
+  records: number, today: number, towns: string[], names: string[], me: string,
+): string | null {
+  if (!r) return records === 0 ? 'No con has landed on this road yet. The first one is named on the wanted board.' : null;
+  const next = towns.map((t, k) => ({ t, k, d: newsArrives(r.day, r.town, k) })).filter((x) => x.k !== r.town && x.d > today).sort((a, b) => a.d - b.d)[0];
+  const hears = next ? ` ${next.t} hears it on day ${next.d}.` : '';
+  if (r.player === me) return `Your con landed in ${towns[r.town]}.${hears}`;
+  return `Day ${r.day}: ${conPhrase(r.class)} landed in ${towns[r.town]}. ${names[r.merchant] ?? 'A merchant'} lost ${r.loss} gold.${hears}`;
+}
+
+/** After the relayer fails to open an account: retry at 10, 20, 40 s, or close the table when it stays unreachable for three tries. */
+export function relayRetry(err: string, attempt: number): { kind: 'busy' | 'closed'; wait: number } {
+  const unreachable = /failed to fetch|networkerror|load failed|50[234]|timed out/i.test(err);
+  return { kind: unreachable && attempt >= 2 ? 'closed' : 'busy', wait: [10, 20, 40][Math.min(attempt, 2)] };
+}

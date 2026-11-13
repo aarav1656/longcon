@@ -65,11 +65,12 @@ export class Chain {
       try {
         try { return await call(this.provider); }
         catch (e) {
-          if (!this.fallback || !/429|-32011|timed out|failed to fetch|networkerror|load failed/i.test(String(e))) throw e;
+          if (!this.fallback || !/429|rate limit|-32011|timed out|failed to fetch|networkerror|load failed/i.test(String(e))) throw e;
           return await call(this.fallback);
         }
       } catch (e) {
-        if (!/429/.test(String(e)) || attempt === pauses.length) throw e;
+        // drpc answers HTTP 200 with error code 15 and "rate limit" in the message, never 429
+        if (!/429|rate limit/i.test(String(e)) || attempt === pauses.length) throw e;
         await new Promise((resolve) => setTimeout(resolve, pauses[attempt]));
       }
     }

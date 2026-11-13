@@ -29,7 +29,8 @@ const rateLimited = async (r: Response): Promise<boolean> => {
   if (r.status === 429) return true;
   if (!r.ok) return false;
   const text = await r.clone().text();
-  return text.length < 400 && /"code"\s*:\s*-429/.test(text);
+  // drpc sends HTTP 200 with code 15 and "rate limit" in the message
+  return text.length < 400 && /"code"\s*:\s*-429|rate limit/i.test(text);
 };
 globalThis.fetch = (async (input: any, init?: any) => {
   const url = typeof input === 'string' ? input : (input.url ?? String(input));

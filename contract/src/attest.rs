@@ -82,6 +82,9 @@ pub fn unparsable() -> Proposed {
 /// A slot the model skipped, repeated or garbled is a refusal, never a guess.
 pub struct BatchTerms {
     pub decisions: Vec<Proposed>,
+    /// Zero-based slots in the order the model listed them: the rank the purse is paid down. Slots
+    /// the model left out follow in slot order.
+    pub order: Vec<usize>,
     pub buy_price: Option<u64>,
     pub sell_price: Option<u64>,
 }
@@ -89,16 +92,20 @@ pub struct BatchTerms {
 pub fn parse_batch(response_body: &str, slots: usize) -> BatchTerms {
     let obj = content_of(response_body).and_then(|c| object_of(&c));
     let mut decisions: Vec<Option<Proposed>> = vec![None; slots];
+    let mut order: Vec<usize> = vec![];
     if let Some(list) = obj.as_ref().and_then(|o| o["decisions"].as_array()) {
         for d in list {
             let slot = num(&d["slot"]).unwrap_or(0) as usize;
             if (1..=slots).contains(&slot) && decisions[slot - 1].is_none() {
                 decisions[slot - 1] = Some(proposed_from(d));
+                order.push(slot - 1);
             }
         }
     }
+    order.extend((0..slots).filter(|s| decisions[*s].is_none()));
     BatchTerms {
         decisions: decisions.into_iter().map(|d| d.unwrap_or_else(unparsable)).collect(),
+        order,
         buy_price: obj.as_ref().and_then(|o| num(&o["buy_price"])),
         sell_price: obj.as_ref().and_then(|o| num(&o["sell_price"])),
     }
@@ -178,6 +185,7 @@ mod tests {
         let c = r#"{"decisions":[{"slot":2,"verdict":"accept","advance":7,"repay":8,"due_days":2,"class":"urgency"},{"slot":1,"verdict":"refuse","advance":0,"repay":0,"due_days":1},{"slot":2,"verdict":"accept","advance":99}],"buy_price":4,"sell_price":6}"#;
         let t = parse_batch(&body(c), 3);
         assert_eq!(t.decisions.len(), 3);
+        assert_eq!(t.order, vec![1, 0, 2], "listed order first, the unanswered slot last");
         assert!(!t.decisions[0].accept);
         assert_eq!((t.decisions[1].accept, t.decisions[1].advance), (true, 7), "the first decision for a slot wins");
         assert!(!t.decisions[2].accept, "slot 3 was never answered");

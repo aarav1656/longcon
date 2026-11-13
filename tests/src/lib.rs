@@ -245,7 +245,7 @@ pub struct OpenOffer {
     pub merchant: u8,
 }
 
-pub const BATCH_WINDOW_BLOCKS: u64 = 6;
+pub const BATCH_WINDOW_BLOCKS: u64 = 30;
 
 /// The storage deposit a join must carry.
 pub fn join_deposit() -> NearToken {

@@ -17,7 +17,7 @@ const metricsFile = process.env.METRICS_FILE;
 // a yield lives 200 blocks; the worker leaves this many blocks for the resume transaction itself
 const YIELD_BLOCKS = 200;
 const RESUME_MARGIN_BLOCKS = 25;
-const BATCH_WINDOW_BLOCKS = Number(process.env.BATCH_WINDOW_BLOCKS ?? 6);
+const BATCH_WINDOW_BLOCKS = Number(process.env.BATCH_WINDOW_BLOCKS ?? 30);
 const MAX_BATCH = 8;
 const inflight = new Set<number>();
 const handled = new Set<number>();

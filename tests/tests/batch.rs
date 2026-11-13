@@ -266,3 +266,98 @@ async fn every_debt_and_record_carries_the_pinned_merchant_configuration() -> Re
     assert_ne!(offer["config_hash"], json!(h1), "a different model is a different configuration");
     Ok(())
 }
+
+fn slot_decision(slot: u64, verdict: &str, advance: u64) -> Value {
+    json!({"slot": slot, "verdict": verdict, "advance": advance, "repay": advance, "due_days": 3, "class": "other", "reason": "ranked"})
+}
+
+#[tokio::test]
+async fn the_purse_is_paid_down_the_order_the_model_lists_not_the_order_of_arrival() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let a = w.player("alice").await?;
+    let b = w.player("bob").await?;
+    let oa = w.open_offer(&a, 0, 10, 10, "alice pitch").await?;
+    let ob = w.open_offer(&b, 0, 10, 10, "bob pitch").await?;
+    let batch = w.seal(0).await?;
+    let body = w.view("batch_body", json!({"batch_id": batch})).await?;
+    // slot 1 is alice, but the merchant trusts bob more and lists him first
+    let content = json!({"decisions": [slot_decision(2, "accept", 10), slot_decision(1, "accept", 10)], "buy_price": 4, "sell_price": 6}).to_string();
+    let (response, signature) = w.signed(body.as_str().unwrap(), &content);
+    let res = w.relay(batch, &response, &signature, "provider_tee").await?.into_result()?;
+    let decision = res
+        .logs()
+        .iter()
+        .filter_map(|l| l.strip_prefix("EVENT_JSON:"))
+        .filter_map(|j| serde_json::from_str::<Value>(j).ok())
+        .find(|e| e["event"] == json!("loan_decision"))
+        .expect("loan_decision event");
+    assert_eq!(decision["data"]["offer_ids"], json!([ob.id, oa.id]), "the event lists the offers in the model's rank");
+    let (ra, rb) = (oa.status.await?.json::<Value>()?, ob.status.await?.json::<Value>()?);
+    println!("alice {ra}\nbob {rb}");
+    assert_eq!(rb["advance"], json!(10), "bob, listed first, is paid in full");
+    assert_eq!(ra["advance"], json!(5), "alice, listed second, gets what is left of the 15 gold loss cap");
+    assert!(clamps(&ra).contains(&"daily_loss".to_string()), "the cut-off is written on the slot that hit the cap");
+    assert!(!clamps(&rb).contains(&"daily_loss".to_string()));
+    w.audit().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_answer_reordered_after_signing_is_rejected_and_pays_nobody() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let a = w.player("alice").await?;
+    let b = w.player("bob").await?;
+    let oa = w.open_offer(&a, 0, 10, 10, "alice pitch").await?;
+    let _ob = w.open_offer(&b, 0, 10, 10, "bob pitch").await?;
+    let batch = w.seal(0).await?;
+    let body = w.view("batch_body", json!({"batch_id": batch})).await?;
+    let honest = json!({"decisions": [slot_decision(1, "accept", 10), slot_decision(2, "refuse", 0)]}).to_string();
+    let (_, signature) = w.signed(body.as_str().unwrap(), &honest);
+    // a rival swaps the ranking after the enclave signed: bob first
+    let swapped = json!({"decisions": [slot_decision(2, "accept", 10), slot_decision(1, "refuse", 0)]}).to_string();
+    let (forged_response, _) = w.signed(body.as_str().unwrap(), &swapped);
+    let err = failure_text(w.relay(batch, &forged_response, &signature, "provider_tee").await).expect("a reordered answer must fail");
+    assert!(err.contains("signature does not verify"), "{err}");
+    let open = w.view("open_batches", json!({})).await?;
+    assert_eq!(open.as_array().unwrap().len(), 1, "the batch is still waiting for the real answer");
+    assert_eq!(w.merchant(0).await?["outstanding"], json!(0), "no gold moved");
+    let _ = oa;
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_answer_signed_for_one_batch_cannot_resolve_the_next_batch() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let a = w.player("alice").await?;
+    let b = w.player("bob").await?;
+    let _oa = w.open_offer(&a, 0, 10, 10, "same pitch").await?;
+    let first = w.seal(0).await?;
+    let _ob = w.open_offer(&b, 0, 10, 10, "same pitch").await?;
+    let second = w.seal(0).await?;
+    assert_ne!(first, second);
+    let body_first = w.view("batch_body", json!({"batch_id": first})).await?;
+    let content = json!({"decisions": [slot_decision(1, "accept", 10)]}).to_string();
+    let (response, signature) = w.signed(body_first.as_str().unwrap(), &content);
+    let err = failure_text(w.relay(second, &response, &signature, "provider_tee").await).expect("batch N answer on batch N+1 must fail");
+    assert!(err.contains("signature does not verify"), "{err}");
+    assert_eq!(w.merchant(0).await?["outstanding"], json!(0));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_pitch_that_arrives_after_the_seal_cannot_enter_the_sealed_batch() -> Result<()> {
+    let w = World::new(Cfg::default()).await?;
+    let a = w.player("alice").await?;
+    let b = w.player("bob").await?;
+    let oa = w.open_offer(&a, 0, 5, 5, "alice pitch").await?;
+    let batch = w.seal(0).await?;
+    let late = w.open_offer(&b, 0, 5, 5, "bob arrives late").await?;
+    let view = w.view("batch", json!({"batch_id": batch})).await?;
+    assert_eq!(view["offer_ids"], json!([oa.id]), "the sealed batch keeps its members");
+    let body = w.view("batch_body", json!({"batch_id": batch})).await?;
+    assert!(!body.as_str().unwrap().contains("bob arrives late"));
+    assert_eq!(w.view("queue", json!({"merchant": 0})).await?[0], json!([late.id]), "the late pitch waits for the next round");
+    let early = failure_text(w.seal_raw(0).await).expect("the next window is still open");
+    assert!(early.contains("the batch window is still open"), "{early}");
+    Ok(())
+}

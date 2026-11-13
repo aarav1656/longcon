@@ -40,8 +40,8 @@ pub const RECORDS_IN_PROMPT: usize = 4;
 /// A landed con stops being news this many days after it landed. Stale or false information
 /// would otherwise persist in every later prompt.
 pub const NEWS_TTL_DAYS: u32 = 8;
-/// Offers for one merchant wait this many blocks (about 3.5 s) so that a batch is weighed together.
-pub const BATCH_WINDOW_BLOCKS: u64 = 6;
+/// Offers for one merchant wait this many blocks (about 20 s) so that a batch is weighed together.
+pub const BATCH_WINDOW_BLOCKS: u64 = 30;
 pub const MAX_BATCH: usize = 8;
 pub const MAX_QUEUE: usize = 64;
 pub const RECORD_SCAN: u64 = 64;

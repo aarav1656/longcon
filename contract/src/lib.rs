@@ -400,7 +400,9 @@ impl Contract {
         let terms = attest::parse_batch(&response, batch.offer_ids.len());
         let mut quotes = Some((terms.buy_price, terms.sell_price));
         let mut decided: Vec<u64> = vec![];
-        for (slot, id) in batch.offer_ids.iter().enumerate() {
+        // the purse is paid down the model's ranking: the first listed traveler is committed first
+        for slot in terms.order.iter().copied() {
+            let id = &batch.offer_ids[slot];
             let offer = self.offers.get(id).unwrap_or_else(|| env::panic_str("batched offer missing"));
             if offer.status != OfferStatus::Pending {
                 continue;

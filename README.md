@@ -8,13 +8,29 @@ Built at NEAR HACKATHON. Tracks: games, security.
 
 Games that let you talk an AI into lending keep their rules on a private server. A player cannot tell whether the model refused or the house did. Long Con moves the lending rules into a contract: the model proposes, the contract decides, and a landed con becomes structured news that can enter the next town's prompt.
 
-## See it live in one minute
+## Make one lie travel three towns (live, no wallet, no install)
 
-Start the local testnet game with the commands below; the ledger page reads a contract directly from NEAR RPC.
+Open https://near-longcon.pages.dev/ in any browser. Every step below runs against the live testnet contract `longcon4-game.testnet`.
+
+1. **Do:** open the link. **See:** a pixel market road, the line "Make one lie travel three towns.", a news ticker written from the newest con on the ledger, and three town tabs that say how many cons each town has heard.
+2. **Do:** press the gold button `Pitch <merchant> gold` (it holds focus, so Enter works). **See:** the stall opens with the "Seed grain" pitch ready: "Two gold until tomorrow for a sack of seed. I pay back three."
+3. **Do:** press `Pitch <merchant>`. **See:** three named steps, `Opening your purse (the road pays gas)`, `Sending your pitch` with a link to your pitch transaction, and the merchant reading it with a seconds counter.
+4. **See, about 30 seconds after the page loaded:** `<merchant> lends you 2 gold`, the bars `You asked`, `<merchant> offered`, `The road allowed`, the repay terms, the line `Signed by Qwen3.8 model in sealed enclave. Checked in browser`, and the road your lie travels: `Pellgate day 146, Millford hears day 147, Oskmoor hears day 147`.
+5. **Do:** open `How answer checked`. **See:** the request and response hashes with copy buttons, the registered signer key matching the published attestation report, the TCB status, and your pitch transaction on nearblocks.
+6. **Do:** press `End day` under the road strip each time daylight runs out (days are 30 seconds), twice. **See:** the debt defaults, the ticker leads with `Your con landed in Pellgate. Millford hears it on day 147.`, the other two tabs read `your con, day 147`, and the strip turns gold town by town as the news arrives.
+7. **Do:** press the Millford tab and pitch. **See:** the waiting state shows what the merchant heard from the road, and the answer is signed on chain like the first.
+8. **Verify on chain:** `near contract call-function as-read-only longcon4-game.testnet con_records json-args '{"from":0,"limit":5}' network-config testnet now`. **See:** the landed con with its class, town, day, principal and the request and response hashes. `news_at` with `{"merchant":1}` returns the same record for the next town once its day arrives.
+
+What no other entry in this field shows in its first minute: a lie you tell becomes a record on the road, the record travels one town per day, and the next merchant's answer is built from it. The ticker, the town tabs and the gold travel strip on the first screen are read from contract state.
+
+Source for the page: `web/src/main.ts`. Check the proof panel's math yourself: `web/src/words.ts` (`signatureValid`, `travelStops`).
+
+## Read the ledger without playing
+
+Start the ledger page with the commands below; it reads a contract directly from NEAR RPC.
 
 1. Serve the ledger page: `python3 -m http.server 8080 --directory web`.
-2. Open http://127.0.0.1:8080/?contract=mygame-game.testnet after running the testnet setup below.
-   See three merchants with treasuries, grain and open loans read from the contract, a signer panel, and con records with their request, response and configuration hashes.
+2. Open http://127.0.0.1:8080/?contract=longcon4-game.testnet.
 
 ## Try it
 

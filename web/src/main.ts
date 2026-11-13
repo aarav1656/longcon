@@ -101,7 +101,7 @@ function skeleton() {
     </section>
     <section class="lower">
       <div class="panel sec" id="mine"></div>
-      <div class="panel sec">
+      <div class="panel sec" id="ledger">
         <div class="head"><h2><span class="ico s scroll"></span>The con ledger</h2><span class="hint" id="ledgernote"></span></div>
         <div class="recs" id="recs"></div>
         <div id="side"></div>
@@ -220,7 +220,7 @@ function renderBar() {
         ${attestation ? '<a href="/attestation.json" target="_blank" rel="noreferrer">Open published report</a>' : '<span>Attestation report unavailable</span>'}
       </div></details>
 `);
-  put('#who', `<span class="ico s lock"></span>${esc(cfg.network)} account <span class="mono" title="${esc(chain.me.id)}">${esc(shortId(chain.me.id, 8, 6))}</span>. ${esc(st?.model ? `Merchants answer with ${st.model}` : 'Reading the road')}${attested ? ', and the signer key matches the published TEE attestation' : ''}. <a href="/index.html">Road ledger</a>`);
+  put('#who', `<span class="ico s lock"></span>${esc(cfg.network)} account <span class="mono" title="${esc(chain.me.id)}">${esc(shortId(chain.me.id, 8, 6))}</span>. ${esc(st?.model ? `Merchants answer with ${st.model}` : 'Reading the road')}${attested ? ', and the signer key matches the published TEE attestation' : ''}. <a href="#ledger">Con ledger</a>`);
 }
 
 function renderRoad() {

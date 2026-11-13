@@ -9,8 +9,9 @@ test('a grifter drops the con the road has just heard and picks the one it has h
   expect(pickClass(doran, heardClasses([{ class: 'borrowed_authority' }, { class: 'urgency' }, { class: 'urgency' }]))).toBe('borrowed_authority');
 });
 
-test('no rival ever pitches the visitor starter class', () => {
-  for (const p of PERSONAS) expect(p.repertoire).not.toContain('future_cargo');
+test('no rival ever speaks the visitor starter pitch word for word', () => {
+  const starter = 'Two gold until tomorrow for a sack of seed. I pay back three.';
+  for (const p of PERSONAS) for (let r = 0; r < 6; r++) expect(pitchFor(p, 'future_cargo', 'Millford', r)).not.toBe(starter);
 });
 
 test('every pitch fits the contract limit and names the amount the rival asks', () => {
@@ -22,7 +23,7 @@ test('every pitch fits the contract limit and names the amount the rival asks', 
     expect(text).not.toContain('{');
   }
   expect(pitchFor(sable, 'false_collateral', 'Pellgate', 0)).toContain('Pellgate');
-  expect(pitchFor(wick, 'urgency', 'Millford', 0)).toContain('5 gold');
+  expect(pitchFor(wick, 'urgency', 'Millford', 0)).toContain('2 gold');
 });
 
 const body = (o: Partial<Body>): Body => ({ id: 'x', persona: 'doran', gold: 20, offersTotal: 0, offersToday: 0, cons: 0, pending: false, ...o });

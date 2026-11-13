@@ -8,14 +8,14 @@ export interface Persona {
   slug: string;
   name: string;
   ask: number;
-  /** Cons this grifter knows, in order of preference. future_cargo is the visitor's starter and stays out of the rivals' hands. */
+  /** Cons this grifter knows, in order of preference. The visitor's starter pitch is index 0 of future_cargo; rivals only use the variants after it. */
   repertoire: ConClass[];
 }
 
 export const PERSONAS: Persona[] = [
-  { slug: 'doran', name: 'Doran Vale', ask: 6, repertoire: ['borrowed_authority', 'urgency'] },
-  { slug: 'wick', name: 'Wick the Pale', ask: 5, repertoire: ['sob_story', 'urgency'] },
-  { slug: 'sable', name: 'Sable Orrin', ask: 7, repertoire: ['false_collateral', 'borrowed_authority'] },
+  { slug: 'doran', name: 'Doran Vale', ask: 3, repertoire: ['borrowed_authority', 'urgency'] },
+  { slug: 'wick', name: 'Wick the Pale', ask: 2, repertoire: ['future_cargo', 'sob_story'] },
+  { slug: 'sable', name: 'Sable Orrin', ask: 4, repertoire: ['false_collateral', 'borrowed_authority'] },
 ];
 
 const PITCHES: Record<string, string[]> = {
@@ -37,6 +37,8 @@ const PITCHES: Record<string, string[]> = {
   ],
   future_cargo: [
     'Two gold until tomorrow for a sack of seed. I pay back three.',
+    'Lend me {ask} gold for seed before the frost. I bring {more} back the day the barley sells.',
+    'A sack of seed costs {ask} gold and I am short. Lend it and the sack pays you {more} at harvest.',
   ],
 };
 
@@ -48,7 +50,7 @@ export function pickClass(p: Persona, heard: Record<string, number>): ConClass {
 }
 
 export function pitchFor(p: Persona, cls: ConClass, town: string, round: number): string {
-  const list = PITCHES[cls];
+  const list = cls === 'future_cargo' ? PITCHES[cls].slice(1) : PITCHES[cls];
   const text = list[round % list.length].replaceAll('{town}', town).replaceAll('{ask}', String(p.ask)).replaceAll('{more}', String(p.ask + 1));
   if (new TextEncoder().encode(text).length > 400) throw new Error(`pitch for ${p.slug}/${cls} is over 400 bytes`);
   return text;

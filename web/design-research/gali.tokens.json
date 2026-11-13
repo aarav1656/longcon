@@ -1,0 +1,56 @@
+{
+ "title": "Gali: The ORE Mining Game",
+ "h1": null,
+ "h2": null,
+ "h3": null,
+ "body": {
+  "text": "DEPLOY SOL. STRIKE GOLD.\nA new round opens on an island with",
+  "font": "Times",
+  "size": "16px",
+  "weight": "400",
+  "tracking": "normal",
+  "leading": "normal",
+  "color": "rgb(255, 255, 255)",
+  "bg": "rgb(18, 58, 107)",
+  "radius": "0px",
+  "padding": "0px",
+  "border": "0px none rgb(255, 255, 255)",
+  "transform": "none",
+  "features": "normal"
+ },
+ "p": null,
+ "a": null,
+ "button": {
+  "text": "NEXT\nENTER",
+  "font": "Arial",
+  "size": "13.3333px",
+  "weight": "400",
+  "tracking": "normal",
+  "leading": "normal",
+  "color": "rgb(255, 255, 255)",
+  "bg": "rgba(0, 0, 0, 0)",
+  "radius": "0px",
+  "padding": "0px",
+  "border": "0px solid rgb(0, 0, 0)",
+  "transform": "none",
+  "features": "normal"
+ },
+ "input": null,
+ "loadedFonts": [
+  "Jersey15_400Regular",
+  "PixelifySans_400Regular",
+  "PixelifySans_600SemiBold",
+  "PixelifySans_700Bold",
+  "Silkscreen_400Regular",
+  "Widget Satoshi"
+ ],
+ "htmlBg": "rgb(7, 13, 32)",
+ "textLen": 286,
+ "height": 900,
+ "url": "https://betatest.gali.lol",
+ "viewport": [
+  1440,
+  900
+ ],
+ "lumaStddev": 32.9
+}

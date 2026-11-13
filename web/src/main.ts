@@ -58,62 +58,80 @@ const requestCaptures: Record<string, { match?: boolean; missed?: boolean; news?
 const offerTx: Record<string, string> = JSON.parse(localStorage.getItem(TX_KEY) ?? '{}');
 let ready = false;
 
+const GREETING = [
+  'Grain, salt, a little credit for honest faces. What brings you to my stall?',
+  'Every coin that passes this gate is counted twice. Make your case, traveller.',
+  'Ships come in, ships go out. Tell me why your story is worth my gold.',
+];
+const TOWN_ART = (m?: Merchant) => Math.min(2, Math.max(0, m?.town ?? selected));
+let seenOutcome = -1;
+let moodUntil = 0;
+let stampFor = -1;
+
 function skeleton() {
   app.innerHTML = `
-  <div class="wrap">
-    <header class="bar" id="bar"></header>
-    <section class="plate g12" aria-label="long con">
-      <h1>talk the road out of its gold<span class="sq"></span></h1>
+  <div class="game">
+    <div class="top">
+      <header class="hud" id="bar"></header>
+      <nav class="roadmap" aria-label="The road">
+        <span class="sr" id="roadnote">Three towns, one road</span>
+        <div id="road"></div>
+      </nav>
+    </div>
+    <section class="stage" id="stage" aria-label="The market stall">
+     <div class="scene">
+      <img class="layer" id="scene-back" alt="" src="/art/town0-back.png">
+      <div class="merchant" id="merchant" data-m="0" role="img" aria-label="The merchant"></div>
+      <img class="layer" id="scene-front" alt="" src="/art/town0-front.png">
+      <div class="sign panel" id="sign"></div>
+      <div class="board panel" id="board" aria-live="polite"></div>
+      <div class="bubble" id="mline" aria-live="polite"></div>
+      <div id="seal"></div>
+      <div class="coins" id="coins"></div>
+      <div class="quest wait" id="move" role="status" aria-live="polite"><span class="dot"></span><span id="movetext"></span></div>
+     </div>
+     <div class="dialog" aria-label="The table">
+      <div class="face">
+        <div class="portrait" id="portrait" data-m="0" role="img" aria-label="Merchant portrait"></div>
+        <p class="nameplate" id="nameplate"></p>
+      </div>
+      <div class="panel speech" id="pitchbox"></div>
+      <div class="panel verdict" id="verdict" aria-live="polite"></div>
+     </div>
     </section>
-    <section class="intro g12">
-      <p class="what">Three merchants on a road of towns lend real gold held in a NEAR contract. Each one is an AI model. You pitch one for an advance. The contract checks the signed answer, then clamps the terms to limits no pitch can move. Skip the repayment and the con lands in a public ledger that the next town reads one day later.</p>
-      <ol class="steps">
-        <li><b>Pick a merchant and pitch.</b> See the merchant's own words and exactly what the road let through.</li>
-        <li><b>Take the advance, end its due day, then one more.</b> See the debt default, your bond burn, and the con enter the ledger.</li>
-        <li><b>Pitch the next town.</b> See its merchant carry the news into the answer.</li>
-      </ol>
+    <section class="lower">
+      <div class="panel sec" id="mine"></div>
+      <div class="panel sec">
+        <div class="head"><h2><span class="ico s scroll"></span>The con ledger</h2><span class="hint" id="ledgernote"></span></div>
+        <div class="recs" id="recs"></div>
+        <div id="side"></div>
+      </div>
     </section>
-    <section class="sec g12 traction" aria-label="live road activity">
-      <div class="head"><h2>the road's record</h2><button class="btn small" type="button" data-act="traction-refresh">Refresh</button></div>
-      <p class="label traction-stamp" id="traction-stamp" aria-live="polite">Reading finalized event receipts.</p>
+    <section class="panel sec traction" aria-label="Live road activity">
+      <div class="head"><h2><span class="ico s star"></span>The road's record</h2><button class="btn small" type="button" data-act="traction-refresh">Refresh</button></div>
       <div class="traction-values" id="traction-values"><p class="empty">Reading finalized event receipts.</p></div>
+      <p class="traction-stamp" id="traction-stamp" aria-live="polite">Reading finalized event receipts.</p>
       <p class="err" id="traction-error" role="status"></p>
     </section>
-    <section class="sec g12" aria-label="the road">
-      <div class="head"><h2>the road</h2><span class="label" id="roadnote"></span></div>
-      <div class="move wait" id="move" role="status" aria-live="polite"><span class="dot"></span><span id="movetext"></span></div>
-      <div class="g12 road" style="grid-column:1/-1;padding:0" id="road"></div>
-    </section>
-    <section class="sec g12 work" aria-label="the table">
-      <div class="head"><h2>the table</h2><span class="label">Nothing here moves gold until the road has checked the answer</span></div>
-      <div class="pitchbox" id="pitchbox"></div>
-      <div class="verdict" id="verdict" aria-live="polite"></div>
-      <div class="block" style="grid-column:1/-1" id="mine"></div>
-    </section>
-    <section class="sec g12 ledger" aria-label="the con ledger">
-      <div class="head"><h2>the con ledger</h2><span class="label" id="ledgernote"></span></div>
-      <div class="recs" id="recs"></div>
-      <div class="side" id="side"></div>
-    </section>
-    <footer><div class="g12"><p id="foot"></p></div></footer>
+    <footer><p class="who" id="who"></p><p id="foot"></p></footer>
   </div>`;
   mountForm();
 }
 
 function mountForm() {
   $('#pitchbox').innerHTML = `
-    <h3>Your pitch</h3>
-    <p class="label" id="target">Pitching Marta in Millford</p>
-    <div class="starters" role="group" aria-label="Pitch starters">
+    <p class="who" id="target">Pitching Marta in Millford</p>
+    <div class="choices" role="group" aria-label="Pitch starters">
       ${STARTERS.map((s, i) => `<button class="btn small" type="button" data-act="starter" data-i="${i}">${esc(s.label)}</button>`).join('')}
     </div>
-    <div class="field"><label class="label" for="pitch">What you say to the merchant</label><textarea id="pitch" maxlength="400" placeholder="Make your case. The merchant weighs it against the news that has reached its town."></textarea><span class="hint" id="pitchcount">0 of 400 bytes</span></div>
-    <div class="row2">
-      <div class="field"><label class="label" for="ask">Gold you ask for</label><input id="ask" type="number" min="1" max="60" value="30" inputmode="numeric"></div>
-      <div class="field"><label class="label" for="bond">Bond you stake</label><input id="bond" type="number" min="0" value="6" inputmode="numeric"></div>
+    <div class="field"><label class="sr" for="pitch">What you say to the merchant</label>
+      <div class="well"><textarea id="pitch" maxlength="400" placeholder="Pick a starter or make your own case. The merchant weighs it against the news in town."></textarea></div></div>
+    <div class="wager">
+      <div class="field"><label for="ask">Gold you ask for</label><div class="well"><span class="ico s coin"></span><input id="ask" type="number" min="1" max="60" value="30" inputmode="numeric"></div></div>
+      <div class="field"><label for="bond">Bond you stake</label><div class="well"><span class="ico s lock"></span><input id="bond" type="number" min="0" value="6" inputmode="numeric"></div></div>
+      <button class="btn gold big" id="send" data-act="pitch" type="button">Pitch</button>
     </div>
-    <p class="hint">The bond is locked while the merchant thinks and burns if you do not repay.</p>
-    <p style="margin-top:12px"><button class="btn primary" id="send" data-act="pitch" type="button">Pitch</button></p>
+    <p class="hint"><span id="pitchcount">0 of 400 bytes</span>. The bond burns if you do not repay.</p>
     <p class="err" id="err" role="alert"></p>`;
   $<HTMLTextAreaElement>('#pitch').addEventListener('input', syncForm);
   $<HTMLInputElement>('#ask').addEventListener('input', syncForm);
@@ -129,13 +147,27 @@ function syncForm() {
   const send = $<HTMLButtonElement>('#send');
   const waiting = !!pv?.pending_offer;
   send.disabled = !ready || waiting || !!busy;
+  send.setAttribute('aria-busy', String(waiting || busy === 'offer'));
   send.textContent = waiting ? 'Waiting for the merchant' : busy === 'offer' ? 'Sending' : m ? `Pitch ${m.name}` : 'Pitch';
   $('#err').textContent = errMsg;
 }
 
+let capturing = false;
+let lastPendingId = 0; // RPC nodes disagree for a moment, so pv.pending_offer can read null while the offer is still waiting
+// The request body is readable only between the seal and the answer, a few seconds: a dedicated loop reads it
+// without waiting for the full road refresh.
 async function captureRequest() {
-  const id = pv?.pending_offer;
-  if (!id || Object.hasOwn(requestCaptures, String(id))) return;
+  if (capturing) return;
+  capturing = true;
+  try {
+    const id = pv?.pending_offer || lastPendingId || (busy === 'offer' ? (await chain.view<PlayerV | null>('player', { account_id: chain.me.id }))?.pending_offer : 0);
+    if (!id || Object.hasOwn(requestCaptures, String(id))) return;
+    lastPendingId = id;
+    await captureRequestFor(id);
+  } finally { capturing = false; }
+}
+
+async function captureRequestFor(id: number) {
   const offer = await chain.view<Offer>('offer_by_id', { offer_id: id });
   if (!offer?.batch) return;
   try {
@@ -149,70 +181,123 @@ async function captureRequest() {
   }
 }
 
-const gold = (n: number) => `<span class="num">${n}</span>`;
-
 function signerSentence(signer: string, model: string): string {
   if (signer === 'gateway') return 'Answer signed by the NEAR AI Cloud gateway TEE; this signature does not name the model.';
   if (signer.startsWith('worker:')) return "Answer signed by the operator's worker key, not a TEE.";
   return signer ? `Answer signed by the ${model} model TEE.` : 'Answer signer not recorded.';
 }
 
+function dayLeft(): { left: number; pct: number } {
+  if (!st || !(st.day_length_ms > 0)) return { left: 0, pct: 100 };
+  const start = Number(BigInt(st.day_started_ns) / 1_000_000n);
+  const left = Math.max(0, Math.ceil((start + st.day_length_ms - Date.now()) / 1000));
+  return { left, pct: Math.min(100, Math.round(((st.day_length_ms / 1000 - left) / (st.day_length_ms / 1000)) * 100)) };
+}
+
 function renderBar() {
   const p = pv;
   const signer = last?.outcome?.signer || st?.model || '';
   const kind = signer === 'gateway' ? 'gateway' : signer.startsWith('worker:') ? 'worker' : 'provider_tee';
-  const signerLine = last?.outcome ? signerSentence(signer, last.outcome.model) : '';
   const registered = Object.fromEntries(st?.signers ?? []);
-  const expectedKey = kind === 'gateway' ? attestation?.gateway_signing_key : attestation?.model_signing_key;
-  const tcb = kind === 'gateway' ? attestation?.tcb_status?.gateway : attestation?.tcb_status?.model?.join(', ');
-  const attestationLine = !attestation ? 'no attestation report is published for this road'
-    : registered[signer] === expectedKey ? `key ${shortId(registered[signer])} matches the published attestation report (fetched ${attestation.fetched_at}, TCB ${tcb})`
-      : 'key does not match the published attestation report';
+  const registeredKey = registered[signer] ?? '';
+  const reportKey = kind === 'gateway' ? attestation?.gateway_signing_key : attestation?.model_signing_key;
+  const tcb = kind === 'worker' ? 'Not attested: worker signer' : kind === 'gateway' ? attestation?.tcb_status?.gateway : attestation?.tcb_status?.model?.join(', ');
+  const attested = kind !== 'worker' && !!attestation && !!registeredKey && registeredKey === reportKey;
+  const d = dayLeft();
   put("#bar", `
-    <div class="mark"><i></i>long con</div>
-    <div class="stat"><span class="label">Road day</span><b>${st?.day ?? '-'}</b></div>
-    <div class="stat"><span class="label">Your gold</span><b>${p ? p.gold : '-'}</b></div>
-    <div class="stat"><span class="label">Bond locked</span><b>${p ? p.locked_bonds : '-'}</b></div>
-    <div class="stat"><span class="label">Credit earned</span><b>${p ? p.earned_line : '-'}</b></div>
-    <div class="who"><span class="label">${esc(cfg.network)} account</span><br><span class="mono" title="${esc(chain.me.id)}">${esc(shortId(chain.me.id, 8, 6))}</span><p>${esc(signerLine || `Road model: ${signer}`)}. ${esc(attestationLine)}</p></div>`);
+    <div class="logo"><div><b>LONG CON</b><small>talk three AI merchants out of their gold</small></div></div>
+    <div class="panel chip day"><span class="ico ${d.left > 0 ? 'sun' : 'moon'}"></span><div><div class="k">Road day</div><div class="v">${st?.day ?? '-'}</div><span class="daybar" title="${d.left > 0 ? `${d.left}s of daylight left` : 'The day can end'}"><i style="width:${d.pct}%"></i></span></div></div>
+    <div class="panel chip" id="purse"><span class="ico coin"></span><div><div class="k">Your gold</div><div class="v">${p ? p.gold : '-'}</div></div></div>
+    <div class="panel chip"><span class="ico lock"></span><div><div class="k">Bond locked</div><div class="v">${p ? p.locked_bonds : '-'}</div></div></div>
+    <div class="panel chip"><span class="ico star"></span><div><div class="k">Credit earned</div><div class="v">${p ? p.earned_line : '-'}</div></div></div>
+    <details class="panel chip proof"><summary><span class="mk ${attested ? 'committed' : kind === 'worker' ? 'timed_out' : 'refused'}"></span><span><span class="k">Signer proof</span><br><b>${attested ? 'TEE match' : kind === 'worker' ? 'Worker key' : 'No match'}</b></span></summary>
+      <div class="provenance" aria-label="Signer provenance">
+        <p>Registered signer: <span data-provenance-signer="${esc(signer)}">${esc(signer)}</span>${kind === 'worker' ? ' · WORKER SIGNER · NOT ATTESTED' : ''}</p>
+        <p>Registered public key: <code class="mono" data-registered-key>${esc(registeredKey || 'Not registered')}</code></p>
+        <p>${kind === 'worker' ? 'Attestation public key: Not applicable to worker signer' : `Attestation public key: <code class="mono" data-report-key>${esc(reportKey ?? 'Unavailable')}</code>`}</p>
+        <p data-key-match>${kind === 'worker' ? 'Worker key is not an attested key' : attested ? 'Matches attestation report' : 'Does not match attestation report'}</p>
+        <p>TCB status: <span data-tcb>${esc(tcb ?? 'Unavailable')}</span></p>
+        ${attestation ? '<a href="/attestation.json" target="_blank" rel="noreferrer">Open published report</a>' : '<span>Attestation report unavailable</span>'}
+      </div></details>
+`);
+  put('#who', `<span class="ico s lock"></span>${esc(cfg.network)} account <span class="mono" title="${esc(chain.me.id)}">${esc(shortId(chain.me.id, 8, 6))}</span>. ${esc(st?.model ? `Merchants answer with ${st.model}` : 'Reading the road')}${attested ? ', and the signer key matches the published TEE attestation' : ''}. <a href="/index.html">Road ledger</a>`);
 }
 
 function renderRoad() {
-  if (!st) { put("#road", '<p class="empty" style="padding:0 8px">Reading the road from the contract.</p>'); return; }
-  const cap = st.rules.loss_cap_per_day;
-  $('#roadnote').textContent = `News moves one town per day. Each merchant can lose at most ${cap} gold a day.`;
+  if (!st) { put("#road", ''); return; }
+  $('#roadnote').textContent = 'Three towns on one road. News of a con travels one town per day.';
   put("#road", st.merchants.map((m, i) => {
-    const allowed = m.outstanding + m.treasury_room;
-    const pct = allowed ? Math.min(100, Math.round((m.outstanding / allowed) * 100)) : 100;
-    const bars = m.due_exposure.slice(0, 6);
-    const nws = news[i] ?? [];
-    return `
-    <article class="m ${i === selected ? 'on' : ''}">
-      <p class="label">${esc(m.town_name)}, town ${m.town + 1} of 3</p>
-      <h3>${esc(m.name)}</h3>
-      <button class="btn small" type="button" data-act="pick" data-m="${i}" aria-pressed="${i === selected}">Select ${esc(m.name)}</button>
-      <p class="gold num">${m.gold}<small>gold in the strongbox</small></p>
-      <dl class="kv">
-        <dt>Grain in stock</dt><dd>${m.grain}</dd>
-        <dt>Buys grain at</dt><dd>${m.buy_price}</dd>
-        <dt>Sells grain at</dt><dd>${m.sell_price}</dd>
-        <dt>Lost to cons so far</dt><dd>${m.lost_total}</dd>
-      </dl>
-      <div class="cap"><span class="label">Lent out</span>
-        <div class="rail" role="img" aria-label="${m.outstanding} of ${allowed} gold lent"><i class="${pct >= 90 ? 'hot' : ''}" style="width:${pct}%"></i></div>
-        <p>${m.outstanding} of ${allowed} gold allowed (${st!.rules.treasury_cap_pct} percent of capital)</p></div>
-      <div class="cap"><span class="label">Gold due to be lost, by day</span>
-        <div class="bars" role="img" aria-label="Gold at risk on each of the next days">${bars.map((v) => `<span class="${v === 0 ? 'zero' : v >= cap ? 'hot' : ''}" style="height:${v === 0 ? 2 : Math.max(6, Math.round((v / cap) * 56))}px" title="${v}"></span>`).join('')}</div>
-        <div class="barlab">${bars.map((v, k) => `<span>${st!.day + k}<br>${v}</span>`).join('')}</div></div>
-      <div class="news"><span class="label">News that has reached ${esc(m.town_name)}</span>
-        ${nws.length ? `<ul>${nws.map((r) => `<li>Day ${r.day}, ${esc(st!.rules.towns[r.town])}: ${esc(classShort(r.class))}, ${r.principal} gold lost</li>`).join('')}</ul>` : '<p class="none">Nothing yet.</p>'}</div>
-      <div class="trade">
-        <input class="small" id="qty${i}" type="number" min="1" value="${qtys[i]}" aria-label="Grain to trade with ${esc(m.name)}" style="width:64px;border:1px solid var(--color-ink);padding:4px 8px;border-radius:0;background:var(--color-paper)">
-        <button class="btn small" type="button" data-act="buy" data-m="${i}">Buy grain</button>
-        <button class="btn small" type="button" data-act="sell" data-m="${i}">Sell grain</button>
-      </div>
-    </article>`;
+    const pos = TOWN_POS[Math.min(2, m.town)] ?? TOWN_POS[i];
+    const heard = (news[i] ?? []).length;
+    return `<button class="town" type="button" data-act="pick" data-m="${i}" aria-pressed="${i === selected}" aria-label="Go to ${esc(m.town_name)} and talk to ${esc(m.name)}" style="left:${(pos.x / 320) * 100}%;top:${(pos.y / 64) * 100}%;background-position-x:${Math.min(2, m.town) * 50}%">
+      ${heard ? `<span class="pin" title="${heard} con${heard > 1 ? 's' : ''} heard of here">${heard}</span>` : ''}
+      <span class="tag">${esc(m.town_name)}</span></button>`;
   }).join(""));
+}
+
+const TOWN_POS = [{ x: 64, y: 43 }, { x: 160, y: 25 }, { x: 256, y: 41 }];
+
+function renderStage() {
+  const m = st?.merchants[selected];
+  const art = TOWN_ART(m);
+  const back = $<HTMLImageElement>('#scene-back');
+  if (!back.src.endsWith(`/art/town${art}-back.png`)) {
+    back.src = `/art/town${art}-back.png`;
+    $<HTMLImageElement>('#scene-front').src = `/art/town${art}-front.png`;
+  }
+  const o = last;
+  const mine = !!o?.outcome && o.merchant === selected;
+  const now = Date.now();
+  if (o?.outcome && o.id !== seenOutcome) {
+    if (seenOutcome !== -1) {
+      moodUntil = now + 2400;
+      if (o.status === 'committed') coinBurst(o.outcome.advance);
+      $('#stage').classList.remove('shake'); void $('#stage').offsetWidth; $('#stage').classList.add('shake');
+    }
+    seenOutcome = o.id;
+  }
+  const mood = pv?.pending_offer ? 'think'
+    : mine && now < moodUntil ? 'talk'
+      : mine && o!.status === 'committed' ? 'pleased'
+        : mine && o!.status === 'refused' ? 'stern' : 'idle';
+  for (const sel of ['#merchant', '#portrait']) {
+    const el = $(sel);
+    el.dataset.m = String(art);
+    el.dataset.mood = mood;
+    el.setAttribute('aria-label', m ? `${m.name}, ${mood === 'think' ? 'reading your pitch' : mood === 'pleased' ? 'pleased' : mood === 'stern' ? 'unmoved' : 'waiting'}` : 'The merchant');
+  }
+  if (mine && !pv?.pending_offer) {
+    if (stampFor !== o!.id) {
+      stampFor = o!.id;
+      setHtml($('#seal'), `<div class="stamp" data-s="${esc(o!.status)}"><span>${esc(o!.status === 'committed' ? `${o!.outcome!.advance} gold advanced` : STATUS_LABEL[o!.status] ?? o!.status)}</span></div>`);
+    }
+  } else if (stampFor !== -1) { stampFor = -1; setHtml($('#seal'), ''); }
+  if (!m) { put('#sign', '<h2>The road</h2><p>Reading the contract</p>'); return; }
+  const allowed = m.outstanding + m.treasury_room;
+  put('#sign', `<h2>${esc(m.town_name)}</h2><p>${esc(m.name)}'s stall, town ${m.town + 1} of 3</p>
+    <p class="srow"><span class="ico s coin"></span>Strongbox <b>${m.gold}</b></p>
+    <p class="srow"><span class="ico s scroll"></span>Lent <b>${m.outstanding}</b> of ${allowed}</p>
+    <p class="srow"><span class="ico s sack"></span>Grain <b>${m.grain}</b>, buys ${m.buy_price}, sells ${m.sell_price}</p>`);
+  put('#nameplate', `${esc(m.name)}<small>${esc(m.town_name)} merchant</small>`);
+  const nws = news[selected] ?? [];
+  put('#board', `<h3><span class="ico s news"></span>News in ${esc(m.town_name)}</h3>
+    ${nws.length ? `<ul>${nws.slice(-3).reverse().map((r) => `<li>Day ${r.day}, ${esc(st!.rules.towns[r.town])}: ${esc(classShort(r.class))}, ${r.principal} gold lost</li>`).join('')}</ul>` : '<p class="none">No cons heard of here yet.</p>'}`);
+  const line = pv?.pending_offer ? `<q>Hmm. Let me think on that.</q>`
+    : mine && o!.outcome ? `<q>${esc(o!.outcome!.reason || 'I have nothing more to say.')}</q>`
+      : `<q>${esc(GREETING[art])}</q>`;
+  put('#mline', line);
+}
+
+function coinBurst(n: number) {
+  const stage = $('#stage').getBoundingClientRect();
+  const purse = document.getElementById('purse')?.getBoundingClientRect();
+  if (!purse) return;
+  const count = Math.max(3, Math.min(12, n));
+  const cx = stage.width * 0.52, cy = stage.height * 0.55;
+  const dx = purse.left + purse.width / 2 - stage.left - cx, dy = purse.top + purse.height / 2 - stage.top - cy;
+  $('#coins').innerHTML = Array.from({ length: count }, (_, k) =>
+    `<i style="left:${cx + (k % 4) * 10 - 15}px;top:${cy - Math.floor(k / 4) * 8}px;--dx:${dx}px;--dy:${dy}px;animation-delay:0s,${k * 70}ms"></i>`).join('');
+  setTimeout(() => { $('#coins').innerHTML = ''; }, 2200);
 }
 
 function renderMove() {
@@ -222,7 +307,7 @@ function renderMove() {
     records: st?.records ?? 0, day: st?.day ?? 1, dueDay: open.length ? Math.max(...open.map((d) => d.due_day)) : undefined,
   });
   const el = $('#move');
-  el.className = `move ${mv.tone}`;
+  el.className = `quest panel ${mv.tone}`;
   $('#movetext').textContent = onboardErr || mv.text;
 }
 
@@ -232,14 +317,14 @@ function renderVerdict() {
   const el = $('#verdict');
   const name = (id: number) => st?.merchants[id]?.name ?? 'The merchant';
   if (pv?.pending_offer) {
-    el.innerHTML = `<h3>The merchant is thinking</h3>
+    setHtml(el, `<h3><span class="ico s hourglass"></span>The merchant is thinking</h3>
       <p class="clock" id="clock">${seconds()}<small>seconds, up to 115 before the bond comes back</small></p>
-      <p class="hint" style="margin-top:12px">The model answers, a signature over the exact request and answer is checked on chain, and only then are the terms clamped and committed.</p>`;
+      <p class="hint" style="margin-top:12px">The model answers, a signature over the exact request and answer is checked on chain, and only then are the terms clamped and committed.</p>`);
     return;
   }
   const o = last;
   if (!o || !o.outcome) {
-    el.innerHTML = `<h3>What the road allowed</h3><p class="empty">Pitch a merchant and this panel shows what you asked for, what the merchant offered, and what the road let through.</p>`;
+    setHtml(el, `<h3><span class="mk pending"></span>What the road allowed</h3><p class="empty" style="margin-top:8px">Pitch a merchant. The seal lands here with what you asked for, what the merchant offered, and what the road let through.</p>`);
     return;
   }
   const oc = o.outcome;
@@ -251,73 +336,69 @@ function renderVerdict() {
   const requestCheck = capture?.match === true ? 'Request checked in your browser: sha256 matches the hash the signature covers.'
     : capture?.match === false ? 'Request bytes did NOT match the hash on chain.'
       : capture?.missed ? 'The answer came back before this page read the request.'
-        : Object.hasOwn(requestCaptures, String(o.id)) ? 'Request not captured in this browser.'
-          : 'Request not captured in this browser.';
+        : 'Request not captured in this browser.';
   const max = Math.max(o.ask, oc.proposed_advance, oc.advance, 1);
   const w = (n: number) => Math.round((n / max) * 100);
   const interest = oc.advance ? oc.repay - oc.advance : 0;
-  el.innerHTML = `<h3><span class="mk ${esc(o.status)}"></span>${esc(STATUS_LABEL[o.status] ?? o.status)} (${esc(name(o.merchant))}, day ${o.day})</h3>
-    <p class="say"><q>${esc(oc.reason || 'The merchant gave no reason.')}</q></p>
-    <p class="fine">${esc(signerSentence(oc.signer, oc.model))}</p>
-    <p class="fine">${signatureOk ? 'Signature checked in your browser.' : 'Signature did NOT verify against the registered key.'}</p>
-    <p class="fine">${requestCheck}</p>
-    ${capture?.news?.length ? `<div class="fine"><span>News in this request:</span><ul>${capture.news.map((line) => `<li>${esc(line)}</li>`).join('')}</ul></div>` : ''}
+  setHtml(el, `<h3><span class="mk ${esc(o.status)}"></span>${esc(STATUS_LABEL[o.status] ?? o.status)}<span class="hint">&nbsp;${esc(name(o.merchant))}, day ${o.day}</span></h3>
     <div class="tri">
-      <div class="r"><span class="label">You asked</span><span class="rail"><i style="width:${w(o.ask)}%"></i></span><b>${o.ask}</b></div>
-      <div class="r"><span class="label">Merchant offered</span><span class="rail"><i style="width:${w(oc.proposed_advance)}%"></i></span><b>${oc.proposed_advance}</b></div>
-      <div class="r allowed"><span class="label">Road allowed</span><span class="rail"><i style="width:${w(oc.advance)}%"></i></span><b>${oc.advance}</b></div>
+      <div class="r"><span class="k">You asked</span><span class="rail"><i style="width:${w(o.ask)}%"></i></span><b>${o.ask}</b></div>
+      <div class="r"><span class="k">Merchant offered</span><span class="rail"><i style="width:${w(oc.proposed_advance)}%"></i></span><b>${oc.proposed_advance}</b></div>
+      <div class="r allowed"><span class="k">Road allowed</span><span class="rail"><i style="width:${w(oc.advance)}%"></i></span><b>${oc.advance}</b></div>
     </div>
     ${oc.clamps.length ? `<ul class="why">${oc.clamps.map((c) => `<li>${esc(clampSentence(c))}</li>`).join('')}</ul>` : o.status === 'committed' ? '<p class="hint">Nothing was clamped: the offer sat inside every limit.</p>' : ''}
-    ${o.status === 'committed' ? `<p>Repay <b>${oc.repay}</b> gold (${interest} interest) by the end of day <b>${oc.due_day}</b>, or your ${o.bond} gold bond burns and a con lands in the ledger as ${esc(classLabel(oc.class))}.</p>` : ''}
-    ${o.status === 'refused' ? `<p>The road filed this pitch as ${esc(classLabel(oc.class))}. Your bond is back in your purse.</p>` : ''}
-    <p class="fine" style="margin-top:12px">${offerTx[o.id] ? `<a href="${esc(txUrl(cfg.explorer, offerTx[o.id]))}" target="_blank" rel="noreferrer">Your pitch transaction</a>. ` : ''}${esc(answeredLine(answeredMs))}Response ${esc(shortId(oc.response_hash, 10, 6))}. Request ${esc(shortId(o.request_hash, 10, 6))}.</p>`;
+    ${o.status === 'committed' ? `<p style="font-size:15px;margin:8px 0">Repay <b>${oc.repay}</b> gold (${interest} interest) by the end of day <b>${oc.due_day}</b>, or your ${o.bond} gold bond burns and a con lands in the ledger as ${esc(classLabel(oc.class))}.</p>` : ''}
+    ${o.status === 'refused' ? `<p style="font-size:15px;margin:8px 0">The road filed this pitch as ${esc(classLabel(oc.class))}. Your bond is back in your purse.</p>` : ''}
+    <p class="fine">${esc(signerSentence(oc.signer, oc.model))} ${signatureOk ? 'Signature checked in your browser.' : 'Signature did NOT verify against the registered key.'} ${requestCheck}</p>
+    ${capture?.news?.length ? `<div class="fine"><span>News in this request:</span><ul>${capture.news.map((line) => `<li>${esc(line)}</li>`).join('')}</ul></div>` : ''}
+    <p class="fine" style="margin-top:6px">${offerTx[o.id] ? `<a href="${esc(txUrl(cfg.explorer, offerTx[o.id]))}" target="_blank" rel="noreferrer">Your pitch transaction</a>. ` : ''}${esc(answeredLine(answeredMs))}</p>
+    <p class="fine">Request hash: <code class="mono" data-request-hash>${esc(o.request_hash)}</code></p>
+    <p class="fine">Response hash: <code class="mono" data-response-hash>${esc(oc.response_hash)}</code></p>`);
 }
 
 function renderMine() {
   const open = pv?.debts.filter((d) => d.status === 'open') ?? [];
   const day = st?.day ?? 1;
-  const endsIn = st && st.day_length_ms > 0 ? Math.max(0, Math.ceil((Number(BigInt(st.day_started_ns) / 1_000_000n) + st.day_length_ms - Date.now()) / 1000)) : 0;
+  const endsIn = dayLeft().left;
   const canEnd = ready && !busy && endsIn === 0;
+  const m = st?.merchants[selected];
   put("#mine", `
-    <div class="g12" style="gap:32px 0;padding:0">
-      <div style="grid-column:1/-1;padding:0 8px" class="dbt">
-        <h3>What you owe</h3>
-        ${open.length ? `<div class="rows">${open.map((d) => `
-          <div class="r"><span class="main"><b>${d.repay}</b> gold to ${esc(st?.merchants[d.merchant]?.name ?? '')}, due by the end of day ${d.due_day}. Bond ${d.bond}.</span>
-          <button class="btn small" data-act="repay" data-d="${d.id}" ${pv && pv.gold >= d.repay && day <= d.due_day && !busy ? '' : 'disabled'} type="button">Pay back</button></div>`).join('')}</div>`
-          : '<p class="empty">No open debts. Take an advance and it shows up here with its due day.</p>'}
-        <p style="margin-top:16px"><button class="btn primary" data-act="endday" type="button" ${canEnd ? '' : 'disabled'}>${endsIn > 0 ? `Day ${day} ends in ${endsIn}s` : `End day ${day}`}</button>
-        <span class="hint" style="margin-left:12px">Debts due today default when the day ends.</span></p>
-      </div>
-      <div style="grid-column:1/-1;padding:0 8px" class="hist">
-        <h3>Your recent pitches</h3>
-        ${history.length ? `<div class="rows">${history.map((h) => `
-          <div class="r"><span class="main"><span class="mk ${esc(h.status)}"></span>Day ${h.day}, ${esc(st?.merchants[h.merchant]?.name ?? '')}: asked ${h.ask}, got ${h.outcome?.advance ?? 0}. ${h.outcome ? esc(classShort(h.outcome.class)) : 'waiting'}</span><span class="fine">${esc(STATUS_LABEL[h.status] ?? h.status)}</span></div>`).join('')}</div>`
-          : '<p class="empty">No pitches yet. The first one is one click away.</p>'}
-      </div>
-    </div>`);
+    <h2><span class="ico s coin"></span>Your purse</h2>
+    <h3>What you owe</h3>
+    ${open.length ? `<div class="rows">${open.map((d) => `
+      <div class="r"><span class="main"><span class="ico s scroll"></span><span><b>${d.repay}</b> gold to ${esc(st?.merchants[d.merchant]?.name ?? '')}, due end of day ${d.due_day}. Bond ${d.bond}.</span></span>
+      <button class="btn small green" data-act="repay" data-d="${d.id}" ${pv && pv.gold >= d.repay && day <= d.due_day && !busy ? '' : 'disabled'} type="button">Pay back</button></div>`).join('')}</div>`
+      : '<p class="empty">No open debts. Take an advance and it shows here with its due day.</p>'}
+    <div class="endrow"><button class="btn big" data-act="endday" type="button" ${canEnd ? '' : 'disabled'}><span class="ico s ${endsIn > 0 ? 'sun' : 'moon'}"></span>${endsIn > 0 ? `Day ${day} ends in ${endsIn}s` : `End day ${day}`}</button>
+      <span class="hint">Debts due today default when the day ends.</span></div>
+    ${m ? `<h3>Trade grain with ${esc(m.name)}</h3>
+    <div class="trade"><div class="well"><input id="qty${selected}" type="number" min="1" value="${qtys[selected]}" aria-label="Grain to trade with ${esc(m.name)}"></div>
+      <button class="btn small" type="button" data-act="buy" data-m="${selected}">Buy at ${m.sell_price}</button>
+      <button class="btn small" type="button" data-act="sell" data-m="${selected}">Sell at ${m.buy_price}</button></div>` : ''}
+    <h3>Your recent pitches</h3>
+    ${history.length ? `<div class="rows">${history.map((h) => `
+      <div class="r"><span class="main"><span class="mk ${esc(h.status)}"></span>Day ${h.day}, ${esc(st?.merchants[h.merchant]?.name ?? '')}: asked ${h.ask}, got ${h.outcome?.advance ?? 0}</span><span class="hint">${h.outcome ? esc(classShort(h.outcome.class)) : 'waiting'}</span></div>`).join('')}</div>`
+      : '<p class="empty">No pitches yet. The first one is one click away.</p>'}`);
 }
 
 function renderLedger() {
   if (!st) return;
   const towns = st.rules.towns;
   $('#ledgernote').textContent = `${st.records} landed, ${st.players} players, ${st.offers} pitches`;
-  put("#recs", `<h3 class="label" style="padding-bottom:8px;border-bottom:2px solid var(--color-ink);margin-bottom:0">Every landed con, newest first</h3>` + (records.length
+  put("#recs", records.length
     ? [...records].reverse().map((r) => `
-      <div class="rec"><span class="n">${r.id}</span>
+      <div class="rec"><span class="n">#${r.id}</span>
         <span><span class="cls">${esc(classShort(r.class))}</span> in ${esc(towns[r.town])}, day ${r.day}, by <span class="mono">${esc(shortId(r.player, 6, 6))}</span></span>
         <span class="lost">-${r.loss}</span>
-        <span class="sub">${towns.map((t, k) => `${esc(t)} ${newsArrives(r.day, r.town, k) <= st!.day ? 'knows' : `hears day ${newsArrives(r.day, r.town, k)}`}`).join(' / ')}. Bond burned ${r.bond_burned}. Response ${esc(shortId(r.response_hash, 8, 6))}</span>
+        <span class="sub">${towns.map((t, k) => `${esc(t)} ${newsArrives(r.day, r.town, k) <= st!.day ? 'knows' : `hears day ${newsArrives(r.day, r.town, k)}`}`).join(' / ')}. Bond burned ${r.bond_burned}. Response <span class="mono">${esc(shortId(r.response_hash, 8, 6))}</span></span>
       </div>`).join('')
-    : '<p class="empty" style="padding-top:16px">No con has landed. When a debt goes unpaid and its day ends, the loss, the class and the hashes of what the model saw and said are written here.</p>'));
+    : '<p class="empty" style="padding-top:8px">No con has landed. When a debt goes unpaid and its day ends, the loss, the class and the hashes of what the model saw and said are written here.</p>');
   put("#side", `
-    <div class="block"><h3>Wanted board</h3>
-      ${wanted.length ? `<div class="rows">${wanted.map((w) => `<div class="r"><span class="main"><b>${esc(classShort(w.class))}</b><br><span class="fine">First by <span class="mono">${esc(shortId(w.first_player, 6, 6))}</span> on day ${w.day}</span></span><span class="num">${w.landed} landed</span></div>`).join('')}</div>` : '<p class="empty">Each new kind of con earns a place here. Be the first to land one.</p>'}
-    </div>
-    <div class="block" style="margin-top:32px"><h3>Rumour tokens you hold</h3>
-      <div class="rows">${CLASSES.map((c) => `<div class="r"><span class="main">${esc(classShort(c))}</span><span class="num">${rumours[c] ?? '0'}</span></div>`).join('')}</div>
-      <p class="hint" style="margin-top:8px">A landed con mints one rumour token to the con artist.</p>
-    </div>`);
+    <h3>Wanted board</h3>
+    ${wanted.length ? `<div class="rows">${wanted.map((w) => `<div class="r"><span class="main"><b>${esc(classShort(w.class))}</b><span class="hint">first by <span class="mono">${esc(shortId(w.first_player, 6, 6))}</span>, day ${w.day}</span></span><span class="num">${w.landed} landed</span></div>`).join('')}</div>` : '<p class="empty">Each new kind of con earns a place here. Be the first to land one.</p>'}
+    <h3>Rumour tokens you hold</h3>
+    <div class="rows">${CLASSES.map((c) => `<div class="r"><span class="main">${esc(classShort(c))}</span><span class="num">${rumours[c] ?? '0'}</span></div>`).join('')}</div>
+    <p class="hint" style="margin-top:8px">A landed con mints one rumour token to the con artist.</p>`);
 }
 
 function renderFoot() {
@@ -325,7 +406,7 @@ function renderFoot() {
 }
 
 function renderAll() {
-  renderBar(); renderRoad(); renderMove(); renderVerdict(); renderMine(); renderLedger(); renderFoot(); syncForm();
+  renderBar(); renderRoad(); renderStage(); renderMove(); renderVerdict(); renderMine(); renderLedger(); renderFoot(); syncForm();
 }
 
 async function refreshTraction() {
@@ -353,6 +434,7 @@ async function refresh() {
     st = s;
     pv = p;
     if (p?.pending_offer) {
+      lastPendingId = p.pending_offer;
       if (!pendingSince) pendingSince = Date.now();
     } else if (busy !== 'offer') {
       if (pendingSince) answeredMs = Date.now() - pendingSince;
@@ -443,7 +525,7 @@ app.addEventListener('click', (ev) => {
   if (a === 'traction-refresh') { void refreshTraction(); return; }
   if (a === 'pick') {
     selected = Number(t.dataset.m);
-    renderRoad(); syncForm();
+    renderAll();
     return;
   }
   if (a === 'starter') {

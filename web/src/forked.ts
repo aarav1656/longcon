@@ -83,7 +83,7 @@ function renderControls() {
       <span class="fk">Back a rule</span>
       <div class="btns">${RULES.map((r) => `<button class="btn ${!fork || backed === r ? 'gold' : ''} big" type="button" data-cap="${r}" ${open && !busy ? '' : 'disabled'} ${busy.startsWith('split') ? 'aria-busy="true"' : ''}>${label(r)}</button>`).join('')}</div>
     </div>
-    <div class="go">
+    <div class="go" ${fork && fork.status !== 'open' && !sealing ? 'hidden' : ''}>
       <button class="btn green big" type="button" data-act="seal" ${fork?.status === 'open' && !busy ? '' : 'disabled'} ${sealing ? 'aria-busy="true"' : ''}>${sealing ? 'The merchant is deciding' : fork && fork.status !== 'open' ? 'Seven days passed' : 'Fast-forward seven days'}</button>
     </div>
     ${onboardFailed ? '<p class="retry"><button class="btn gold" type="button" data-act="retry">Retry</button></p>' : ''}

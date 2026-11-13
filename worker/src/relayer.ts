@@ -65,9 +65,8 @@ async function early(txHash: string, sender: string): Promise<{ ok: boolean; err
     }
     const top = r.status;
     if (top?.Failure) return { ok: false, error: JSON.stringify(top.Failure).slice(0, 400) };
-    if (top?.SuccessValue !== undefined) return { ok: true };
-    const call = outs.find((o) => o.outcome?.status && (o.outcome.status.SuccessReceiptId || o.outcome.status.SuccessValue !== undefined));
-    if (outs.length >= 3 && call) return { ok: true };
+    const call = outs.find((o) => (o.outcome?.executor_id ?? o.outcome?.executorId) === contractId && o.outcome?.status && (o.outcome.status.SuccessReceiptId || o.outcome.status.SuccessValue !== undefined));
+    if (call) return { ok: true };
   }
   return { ok: true };
 }

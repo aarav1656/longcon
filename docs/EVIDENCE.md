@@ -710,3 +710,16 @@ Counts at finalized height `277274723`: pitches `53`, loans `36`, defaults `36`.
 | Round | batch `128`, merchant `0`, offers `[206,207,208,209,210]`, block `277518457`, request hash `7effef69365a1921f84aa62cd703a2751edbbd4d49a29f5bc4ad6d2f1dc433b4`, read with `near contract call-function as-read-only longcon4-game.testnet batch json-args '{"batch_id":128}' network-config testnet now` |
 | Who | the page in a browser plus two scripted travelers (`web/scripts/pitch-as.ts`, offers 209 and 210) started within one second; both committed (advance 2 and 3) from the same signed response, tx `44qfnVywwErcC2xaTJYTBnbx5WcmXG1Z5rRVs3nMtJEA` and `4ycH9QdsyLCQauscpU9Sim8ZjNfvmeECwPes4xtkAtJh` |
 | Console | the browser run recorded 0 HTTP errors and 0 network failures from the site origin |
+
+## Forked Town: one signed answer, two rules, one receipt
+
+| What | Value |
+|---|---|
+| Run | `bun web/scripts/fork-as.ts 25` from a cold account, 43.8 s from first call to settled claim; fork `4` on `longcon4-game.testnet`, merchant `0`, signer `Qwen/Qwen3.8-27B` (registered signer equals a fresh NEAR AI attestation, `scripts/signer-check.sh`) |
+| Split | the four-traveler queue goes to two branches that differ only in the daily loss cap; tx `D9JgesW6SAd2tKugWijBzQTxnpCspgCd8NP6oQKYhr6m`, sealed by tx `7ugejFvYP7xnWgqJ7pKhUTQoKnDhn66Eiqto7FNJAxoe` |
+| Result | resolved at block `277531233`; cap 15 books Tam 10 and Ines 5 and ends at 204 gold with no default; cap 25 books Tam 10, Ines 12 and Sable 3, Sable defaults, and ends at 201 gold. The first divergent day is day 0 |
+| Settled claim | `fork_settle` with the recorded receipt, tx `CjSj1WxJ6Ta3Affm3k2Jd8i1MshXjptDMwE6fsSPBBTb`; the backed cap 25 lost |
+| Must-fail, rule edit | `fork_rule` after the seal is refused with "the rule is frozen", tx `BvWddPmeBBqRJZYZNEPq7sxSMz5ivo8eaYxmFwhvQMxv` |
+| Must-fail, wrong receipt | `fork_settle` with a forged receipt is refused with "that receipt is not the divergence this contract recorded", tx `EGSGJCpGMCnFWEvK6f7jjsBYK8ZTxge5f6UrWBPD5A8v` |
+| Must-fail, replay | a second `fork_settle` is refused with "this claim is already settled", tx `6G6fqzqYnYrdQJu3331e6FYvuX8eAVfzW8ggqjNw5mur` |
+| Relayer reports the contract's refusal | `web/scripts/relay-fail-check.ts` sends a call the contract refuses; the relayer answers 422 with the contract's sentence |

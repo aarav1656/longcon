@@ -8,10 +8,10 @@ export interface CastMember { name: string; ask: number; bond: number; pitch: st
 
 /** Two rival grifters and two honest traders, all waiting at one stall. The merchant never sees `repays`. */
 export const CAST: CastMember[] = [
-  { name: 'Wick the Pale', ask: 20, bond: 20, repays: false, pitch: 'A barge of seed docks at Pellgate in two days. Lend me 20 gold for the toll and 24 comes back the day it docks, due in two days.' },
-  { name: 'Sable Orrin', ask: 14, bond: 14, repays: false, pitch: 'I leave you the deed to my loom, worth thirty gold, in a barn at the edge of town. Lend 14 gold against it, repaid in two days.' },
+  { name: 'Wick the Pale', ask: 20, bond: 20, repays: false, pitch: 'I am Wick, factor of the Pellgate grain guild, and the guild seal is on this letter. Lend 20 gold and 24 comes back when the guild pays on market day, two days from now.' },
+  { name: 'Sable Orrin', ask: 14, bond: 14, repays: false, pitch: 'I have woven your sacking for three years. 14 gold for thread, 17 back on market day, two days from now.' },
   { name: 'Ines Cobb', ask: 12, bond: 12, repays: true, pitch: 'I have bought your spring wool for six years. 12 gold for rope today, 14 back on market day, two days from now.' },
-  { name: 'Tam Hollin', ask: 10, bond: 10, repays: true, pitch: 'The ferry toll is 10 gold and my cart pays 12 on the far bank. Repaid in two days, as I did last winter.' },
+  { name: 'Tam Hollin', ask: 10, bond: 10, repays: true, pitch: 'I have hauled your wool to the ferry for four years. 10 gold for the toll, 12 back on market day, two days from now.' },
 ];
 
 export interface DayRow { day: number; gold: number; outstanding: number; defaults: number; lost: number; hash: string }

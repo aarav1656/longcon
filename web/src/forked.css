@@ -1,0 +1,130 @@
+/* Forked Town: one stall, two rules, two towns side by side. Reuses the pixel kit in style.css. */
+.fork { width: min(1320px, 100%); margin: 0 auto; padding: 10px 12px 56px; display: grid; gap: 14px; }
+.ftop { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
+.flogo { display: flex; flex-direction: column; gap: 2px; padding: 0 6px; }
+.flogo b { font-size: 30px; font-weight: 700; color: var(--gold); text-shadow: 0 3px 0 var(--gold-3), 0 5px 0 var(--ink); line-height: 1; white-space: nowrap; }
+.flogo small { display: block; font-size: 14px; color: var(--gold-2); letter-spacing: .08em; text-transform: uppercase; }
+.fdeck { font-size: 18px; color: var(--cream); line-height: 1.25; max-width: 58ch; }
+.net { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.net .fdot { width: 10px; height: 10px; background: var(--slate); box-shadow: 0 0 0 2px var(--ink); }
+.net .fdot.on { background: var(--green-2); }
+
+.fqueue h2, .fproof h2, .fverdict h2 { display: flex; align-items: center; gap: 8px; font-size: 17px; color: var(--gold); line-height: 1.2; }
+.cast { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.card { background: var(--navy); box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--navy-3); padding: 8px 10px 10px; display: grid; gap: 6px; align-content: start; }
+.card .fwho { display: flex; flex-direction: column; gap: 1px; }
+.card b { font-size: 15px; color: var(--cream); }
+.card .ask { font-size: 12px; color: var(--gold-2); }
+.card q { quotes: none; font-size: 13.5px; line-height: 1.35; color: var(--cream-2); }
+
+.controls { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 16px; align-items: center; padding: 4px 2px; }
+.controls .pick { display: flex; align-items: center; gap: 12px; }
+.controls .fk { font-size: 13px; color: var(--muted); }
+.controls .btns { display: flex; gap: 10px; }
+.controls .btn small { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.status { font-size: 14px; color: var(--cream-2); min-height: 20px; }
+.status .num { color: var(--gold); font-weight: 700; }
+
+.twins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.twin { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.twin .fscene { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--stage-sky); box-shadow: 0 0 0 4px var(--ink), 0 0 0 8px var(--gold-3), 0 10px 0 4px var(--shade); }
+.twin.backed .fscene { box-shadow: 0 0 0 4px var(--ink), 0 0 0 8px var(--gold), 0 10px 0 4px var(--shade); }
+.twin.wins .fscene { box-shadow: 0 0 0 4px var(--ink), 0 0 0 8px var(--green-2), 0 10px 0 4px var(--shade); }
+.twin .layer { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.ftag { position: absolute; left: 2.5%; top: 4%; max-width: 58%; background: var(--scrim); box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--gold-3); padding: 6px 10px 8px; }
+.ftag h2 { font-size: clamp(16px, 2.2vw, 26px); font-weight: 700; line-height: 1; color: var(--gold); text-shadow: 0 3px 0 var(--ink); }
+.ftag p { font-size: 12.5px; color: var(--cream-2); margin-top: 4px; line-height: 1.25; }
+.you { position: absolute; right: 2.5%; top: 4%; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-ink); background: var(--gold); padding: 3px 8px 4px; box-shadow: 0 0 0 2px var(--ink); }
+.pursebar { position: absolute; left: 2.5%; bottom: 5%; display: flex; align-items: center; gap: 8px; background: var(--scrim); box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--gold-3); padding: 4px 12px 5px 8px; }
+.pursebar .fcoin { width: 20px; height: 20px; background: url('/art/icons.png') 0 0 / 200px 20px; image-rendering: pixelated; }
+.pursebar b { font-size: 26px; line-height: 1; color: var(--cream); min-width: 3ch; }
+.pursebar .fk { font-size: 12px; color: var(--muted); }
+.fstamp { position: absolute; right: 4%; bottom: 14%; font: 700 clamp(18px, 3vw, 34px) var(--font-pixel); color: var(--red-2); border: 4px solid var(--red); padding: 2px 12px; transform: rotate(-6deg); background: rgba(40, 10, 10, .72); animation: stampin .35s steps(4) both; }
+.crown { position: absolute; right: 4%; bottom: 8%; font: 700 clamp(14px, 2vw, 22px) var(--font-pixel); color: var(--green-3); background: var(--green-2); padding: 3px 12px; box-shadow: 0 0 0 3px var(--ink); animation: stampin .35s steps(4) both; }
+@keyframes stampin { from { transform: scale(1.7) rotate(-14deg); opacity: 0; } }
+
+.ledger { display: grid; gap: 8px; }
+.loans { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.loans li { display: flex; align-items: baseline; gap: 6px; font-size: 13.5px; padding: 4px 8px; background: var(--navy); box-shadow: 0 0 0 2px var(--navy-3); min-width: 0; }
+.loans li b { color: var(--cream); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loans li span { margin-left: auto; white-space: nowrap; color: var(--cream-2); }
+.loans li em { font-style: normal; font-size: 11px; font-weight: 700; color: var(--gold-ink); background: var(--gold); padding: 0 5px; }
+.loans li.lent span { color: var(--green-2); }
+.loans li.cut span { color: var(--gold); }
+.loans li.no span { color: var(--red-2); }
+.loans li.wait span { color: var(--placeholder); }
+.hold { font-size: 13.5px; color: var(--muted); }
+.chart { width: 100%; height: auto; background: var(--night); box-shadow: 0 0 0 2px var(--navy-3); }
+.chart polyline { fill: none; stroke: var(--gold); stroke-width: 3; stroke-linejoin: round; }
+.chart circle { fill: var(--gold-2); }
+.chart circle.now { fill: var(--cream); }
+.chart .split { stroke: var(--red-2); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.chart .splitlabel { fill: var(--red-2); font: 600 11px var(--font); }
+.feed { list-style: none; margin: 0; padding: 0; font-size: 13px; display: grid; gap: 2px; min-height: 80px; align-content: start; }
+.feed li { display: flex; gap: 8px; color: var(--cream-2); }
+.feed li span { color: var(--muted); min-width: 44px; }
+.feed li.default { color: var(--red-2); }
+.feed li.repay { color: var(--green-2); }
+.feed li.cap { color: var(--gold); }
+
+.fverdict, .fproof { padding: 6px 10px 8px; }
+.fverdict h2 { font-size: 22px; line-height: 1.2; }
+.claim { font-size: 15.5px; color: var(--cream-2); margin-top: 6px; line-height: 1.35; }
+.claim.won { color: var(--green-2); }
+.claim.lost { color: var(--red-2); }
+.fclock { margin-top: 8px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.fclock .num { color: var(--gold); }
+.fnote { margin-top: 8px; padding: 6px 10px; font-size: 14px; }
+.fnote.bad { background: rgba(200, 64, 56, .22); box-shadow: inset 0 0 0 2px var(--red); color: var(--red-2); }
+.fnote.ok { background: rgba(86, 170, 90, .2); box-shadow: inset 0 0 0 2px var(--green); color: var(--green-2); }
+.txl { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; margin-right: 12px; }
+.fproof dl { margin: 8px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 28px; }
+.fproof dl div { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 8px; padding: 3px 0; border-top: 2px dashed var(--navy-3); }
+.fproof dt { font-size: 12.5px; color: var(--muted); }
+.fproof dd { margin: 0; color: var(--cream); overflow-wrap: anywhere; }
+.fproof .links { margin-top: 8px; font-size: 14px; }
+.fproof .read { margin-top: 6px; color: var(--muted); overflow-wrap: anywhere; }
+.fproof .edit { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+.ffoot { min-height: 8px; }
+.ferr { padding: 48px 8px; color: var(--red-2); }
+
+@media (max-width: 900px) {
+  .ftop { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .ftop .fdeck { font-size: 15px; }
+  .net { font-size: 12px; }
+  .cast { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .controls { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .controls .pick { flex-direction: column; align-items: stretch; gap: 4px; }
+  .controls .btns { display: grid; grid-template-columns: 1fr 1fr; }
+  .controls .btn { width: 100%; }
+  .twins { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .fproof dl { grid-template-columns: minmax(0, 1fr); }
+  .fproof dl div { grid-template-columns: 124px minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .fork { padding: 8px 8px 48px; gap: 10px; }
+  .flogo b { font-size: 24px; }
+  .card { padding: 6px 8px 8px; }
+  .card q { font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .controls .btn.big { font-size: 16px; }
+  .loans { grid-template-columns: minmax(0, 1fr); }
+}
+.fork .btn { font-family: var(--font); font-weight: 700; letter-spacing: 0; }
+.fork .btn.big { font-size: 19px; }
+@media (max-width: 520px) {
+  .ftag p { display: none; }
+  .ftag { max-width: 70%; padding: 4px 8px 6px; }
+  .ftag h2 { font-size: 15px; }
+}
+.fmini { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 14px; color: var(--cream-2); }
+.fmini b { color: var(--gold); margin-right: 4px; }
+.chip2 { background: var(--navy); box-shadow: 0 0 0 2px var(--navy-3); padding: 1px 8px 2px; cursor: help; }
+.chip2 em { font-style: normal; color: var(--gold); font-weight: 700; }
+.fchartbox { position: absolute; right: 2.5%; bottom: 5%; width: 44%; background: rgba(18, 22, 36, .86); box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--gold-3); padding: 4px; }
+.fchartbox .chart { box-shadow: none; background: transparent; display: block; }
+.fstamp { right: 4%; bottom: auto; top: 27%; }
+.crown { bottom: auto; top: 22%; right: 2.5%; background: var(--green-2); color: #10381a; }
+.fork .btn.gold:disabled { filter: none; opacity: .92; cursor: default; }
+.fork .btn.green:disabled { filter: none; opacity: .75; }
+.fverdict[hidden] { display: none; }
+@media (max-width: 520px) { .fchartbox { width: 52%; } .pursebar b { font-size: 20px; } }

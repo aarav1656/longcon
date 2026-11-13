@@ -133,7 +133,7 @@ export class Chain {
   }
 
   /** Sign one function call as a NEP-366 delegate and let the relayer pay for it. */
-  async send(method: string, args: Record<string, unknown>): Promise<{ tx?: string }> {
+  async send(method: string, args: Record<string, unknown>): Promise<{ tx?: string; value?: string }> {
     const pk = this.me.kp.getPublicKey();
     const [key, block] = await Promise.all([
       this.rpc((provider) => provider.viewAccessKey({ accountId: this.me.id, publicKey: pk.toString() })),
@@ -155,7 +155,7 @@ export class Chain {
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.ok === false) throw new ChainError(explain(j.error ?? `relay ${r.status}`), j.tx);
-    return { tx: j.tx };
+    return { tx: j.tx, value: j.value };
   }
 }
 

@@ -34,3 +34,27 @@ export function richer(f: Fork): 0 | 1 | null {
   const [a, b] = f.branches;
   return a.final_gold === b.final_gold ? null : a.final_gold > b.final_gold ? 0 : 1;
 }
+
+export interface FeedLine { day: number; text: string; kind: 'lend' | 'repay' | 'default' | 'cap' }
+
+/** What happened in one branch, day by day, read from its loans: advances on day 0, repayments and defaults on each due day. */
+export function dayFeed(b: Branch): FeedLine[] {
+  const out: FeedLine[] = [];
+  for (const l of b.loans) {
+    if (!l.accepted || l.advance <= 0) continue;
+    out.push({ day: 0, kind: l.clamps.length ? 'cap' : 'lend', text: l.clamps.length ? `${l.name} asks ${l.proposed_advance}, the cap lets ${l.advance} through` : `${l.name} borrows ${l.advance}` });
+    out.push(l.repays
+      ? { day: l.due_day, kind: 'repay', text: `${l.name} repays ${l.repay}` }
+      : { day: l.due_day, kind: 'default', text: `${l.name} never returns, ${l.advance} lost` });
+  }
+  return out.sort((x, y) => x.day - y.day);
+}
+
+/** The sentence under the two towns: which rule leaves more gold, and by how much. */
+export function verdictLine(f: Fork): string {
+  const w = richer(f);
+  const [a, b] = f.branches;
+  if (w === null) return `Both towns end on ${a.final_gold} gold. The cap changed nothing this time.`;
+  const win = f.branches[w], lose = f.branches[1 - w];
+  return `The loss cap of ${win.rule} leaves the merchant ${win.final_gold - lose.final_gold} gold ahead of the cap of ${lose.rule}.${win.defaults < lose.defaults ? ` ${lose.defaults} default${lose.defaults > 1 ? "s reach" : " reaches"} the looser town.` : ""}`;
+}

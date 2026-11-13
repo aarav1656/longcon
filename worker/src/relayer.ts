@@ -49,7 +49,7 @@ async function exists(id: string): Promise<boolean> {
 }
 
 /** First outcome of the transaction: a failure in the call itself shows within a few seconds, a yielded offer stays open. */
-async function early(txHash: string, sender: string): Promise<{ ok: boolean; error?: string }> {
+async function early(txHash: string, sender: string): Promise<{ ok: boolean; error?: string; value?: string }> {
   for (let i = 0; i < 14; i++) {
     await sleep(500);
     let r: any;
@@ -66,7 +66,12 @@ async function early(txHash: string, sender: string): Promise<{ ok: boolean; err
     const top = r.status;
     if (top?.Failure) return { ok: false, error: JSON.stringify(top.Failure).slice(0, 400) };
     const call = outs.find((o) => (o.outcome?.executor_id ?? o.outcome?.executorId) === contractId && o.outcome?.status && (o.outcome.status.SuccessReceiptId || o.outcome.status.SuccessValue !== undefined));
-    if (call) return { ok: true };
+    if (call) {
+      const sv = call.outcome.status.SuccessValue;
+      let value: string | undefined;
+      try { if (sv) value = Buffer.from(sv, "base64").toString(); } catch { value = undefined; }
+      return { ok: true, value };
+    }
   }
   return { ok: true };
 }
@@ -121,7 +126,7 @@ Bun.serve({
         } as any);
         const txHash = res?.transaction?.hash ?? res?.transactionOutcome?.id ?? res?.transaction_outcome?.id;
         const e = await early(txHash, checked.senderId);
-        return json({ ok: e.ok, error: e.error, method: checked.method, tx: txHash }, e.ok ? 200 : 422);
+        return json({ ok: e.ok, error: e.error, value: e.value, method: checked.method, tx: txHash }, e.ok ? 200 : 422);
       }
       return json({ error: 'not found' }, 404);
     } catch (e: any) {

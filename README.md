@@ -15,7 +15,7 @@ Games that let you talk an AI into lending keep their rules on a private server.
 
 Open https://near-longcon.pages.dev/game in any browser. Every step below runs against the live testnet contract `longcon4-game.testnet`.
 
-1. **Do:** open the link. **See:** a pixel market road, the line "Pick a rule. The contract splits the town in two and one signed answer runs through both.", the queue at Marta's stall (`Wick 20`, `Sable 14`, `Ines 12`, `Tam 10`) and two buttons, `Daily loss cap 15` and `Daily loss cap 25`. The status reads `NEAR testnet, account ready` once your account exists on testnet.
+1. **Do:** open the link. **See:** a pixel market road, the line "Pick a rule. The contract splits the town in two and one signed answer runs through both.", the queue at Marta's stall (`Wick 20`, `Sable 20`, `Ines 12`, `Tam 10`) and two buttons, `Daily loss cap 15` and `Daily loss cap 25`. The status reads `NEAR testnet, account ready` once your account exists on testnet.
 2. **Do:** press one cap. **See:** the town splits into two panes that differ only in the daily loss cap; your pick is tagged `BACKED`. The `fork_town` transaction link appears in the proof panel.
 3. **Do:** press `Fast-forward`. **See:** the contract sends the whole queue to one NEAR AI request and one signed answer comes back. The seven days replay in the two towns at 700 ms per day: a gold line per town, the day-by-day loan feed, and a `DEFAULT` stamp on the town where a borrower never repays.
 4. **See:** a banner above the scenes names which cap keeps more gold. Your backed cap is settled by the contract against the receipt it recorded; the `fork_settle` transaction link and the seconds from page load to the settled claim appear under the banner.

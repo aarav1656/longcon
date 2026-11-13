@@ -72,8 +72,8 @@ if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
   printf 'FAIL live contract access-key list: missing %s
 ' "$missing"
 else
-  account_body=$(printf '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_account","finality":"final","account_id":"%s"}}' "$account")
-  if account_json=$(rpc_post "$account_body") && jq -e '.result.code_hash | type == "string" and length > 20 and . != "11111111111111111111111111111111"' >/dev/null 2>&1 <<<"$account_json"; then
+  account_body=$(printf '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_code","finality":"final","account_id":"%s"}}' "$account")
+  if account_json=$(rpc_post "$account_body") && jq -e '.result | (.hash | type == "string" and length > 20) and (.code_base64 | type == "string" and length > 1000)' >/dev/null 2>&1 <<<"$account_json"; then
     printf 'PASS live deployed contract code: %s
 ' "$account"
     pass=$((pass + 1))
@@ -82,7 +82,7 @@ else
 ' "$account"
   fi
   keys_body=$(printf '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"%s"}}' "$account")
-  if [ -n "${account_json:-}" ] && jq -e '.result.code_hash | type == "string" and length > 20 and . != "11111111111111111111111111111111"' >/dev/null 2>&1 <<<"$account_json" && keys_json=$(rpc_post "$keys_body") && jq -e '.result.keys | type == "array"' >/dev/null 2>&1 <<<"$keys_json"; then
+  if [ -n "${account_json:-}" ] && jq -e '.result | (.hash | type == "string" and length > 20) and (.code_base64 | type == "string" and length > 1000)' >/dev/null 2>&1 <<<"$account_json" && keys_json=$(rpc_post "$keys_body") && jq -e '.result.keys | type == "array"' >/dev/null 2>&1 <<<"$keys_json"; then
     key_count=$(jq -r '.result.keys | length' <<<"$keys_json")
     printf 'PASS live contract access-key list: %s keys at block %s
 ' "$key_count" "$(jq -r '.result.block_height' <<<"$keys_json")"

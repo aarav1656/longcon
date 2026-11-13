@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { KeyPair, KeyPairSigner, actions, buildDelegateAction, encodeSignedDelegate } from 'near-api-js';
-import { budgets, clientKey, vet } from '../src/delegate.ts';
+import { budgets, clientKey, proxiedClient, vet } from '../src/delegate.ts';
 
 const CONTRACT = 'longcon.testnet';
 
@@ -80,4 +80,13 @@ test('the join budget stops at its maximum and frees a slot when the window pass
   expect(may(1005)).toBe(true);
   expect(may(1015)).toBe(true);
   expect(may(1016)).toBe(false);
+});
+
+test('proxiedClient keys on the forwarded address only with the shared secret', () => {
+  const secret = 'abcdefghijklmnop0123456789';
+  expect(proxiedClient(secret, secret, '198.51.100.7', 'edge')).toBe('proxied:198.51.100.7');
+  expect(proxiedClient(secret, 'abcdefghijklmnop0123456780', '198.51.100.7', 'edge')).toBe('edge');
+  expect(proxiedClient(secret, null, '198.51.100.7', 'edge')).toBe('edge');
+  expect(proxiedClient('', '', '198.51.100.7', 'edge')).toBe('edge');
+  expect(proxiedClient(secret, secret, null, 'edge')).toBe('edge');
 });

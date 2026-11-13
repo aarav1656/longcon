@@ -482,3 +482,11 @@ footer { padding: 14px 12px; }
 .chip .v, .tri b, .clock, .traction-grid dd, .sign b, .num { font-family: var(--font); font-weight: 700; }
 .err:empty { display: none; }
 textarea { min-height: 56px; }
+h3 .num, .stamp span, .chip .v { font-family: var(--font); font-weight: 700; }
+@media (max-width: 700px) {
+  .board, .bubble { display: none; }
+  .choices { flex-wrap: nowrap; gap: 4px; }
+  .choices .btn { font-size: 13px; padding: 0 2px; min-width: 0; flex: 1; }
+  .choices .btn::before { display: none; }
+  .face .say { font-size: 14px; }
+}

@@ -2,6 +2,6 @@
   "contract_id": "longcon4-game.testnet",
   "network": "testnet",
   "rpc": "https://near-testnet.drpc.org",
-  "relayer": "https://teslas-mac-mini.tail57f771.ts.net/longcon-relay",
+  "relayer": "/api/relay",
   "explorer": "https://testnet.nearblocks.io"
 }

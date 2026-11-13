@@ -495,7 +495,7 @@ function renderVerdict() {
       : debt?.status === 'defaulted' ? `Unpaid. Your ${o.bond} gold bond burned and your con is in the ledger.` : '';
   const rec = records.find((r) => r.debt_id === oc.debt_id);
   const tx = offerTx[o.id];
-  setHtml(el, `<h3 class="win"><span class="mk"></span>${esc(mn)} lends you ${oc.advance} gold</h3>${bars}${clamps}
+  setHtml(el, `<h3 class="win"><span class="mk"></span>${esc(mn)} lends you <b class="num">${oc.advance}</b> gold</h3>${bars}${clamps}
     <p class="say2">${consequence}</p>
     ${route(o, oc)}
     <div class="actions">${open && debt ? `<button class="btn small green" type="button" data-act="repay" data-d="${debt.id}" ${pv && pv.gold >= debt.repay && !busy ? '' : 'disabled'}>Pay back ${debt.repay}</button>` : ''}

@@ -149,3 +149,15 @@ test('answerPhase orders relay trouble, waiting, sending, queued, then the last 
   expect(answerPhase({ ...base, last: { status: 'refused', proposed: 2, clamps: 1 } })).toBe('blocked');
   expect(answerPhase({ ...base, last: { status: 'timed_out', proposed: 0, clamps: 0 } })).toBe('timed_out');
 });
+
+import { upstreamFor } from '../src/relayproxy.ts';
+
+test('relay proxy forwards only the three relayer routes with their methods', () => {
+  const up = 'https://relay.example/longcon-relay/';
+  expect(upstreamFor(['activate'], up, 'POST')).toBe('https://relay.example/longcon-relay/activate');
+  expect(upstreamFor('relay', up, 'POST')).toBe('https://relay.example/longcon-relay/relay');
+  expect(upstreamFor(['health'], up, 'GET')).toBe('https://relay.example/longcon-relay/health');
+  expect(upstreamFor(['activate'], up, 'GET')).toBeNull();
+  expect(upstreamFor(['..', 'admin'], up, 'POST')).toBeNull();
+  expect(upstreamFor(undefined, up, 'GET')).toBeNull();
+});

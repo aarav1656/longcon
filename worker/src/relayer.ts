@@ -1,5 +1,5 @@
 import { account, env, provider, view } from './chain.ts';
-import { budgets, callFor, clientKey, toAction, vet } from './delegate.ts';
+import { budgets, callFor, clientKey, proxiedClient, toAction, vet } from './delegate.ts';
 import { sleep } from './lib.ts';
 import { parseNearAmount } from 'near-api-js';
 
@@ -69,7 +69,8 @@ Bun.serve({
   async fetch(req, server) {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
-    const who = clientKey(req.headers.get('x-forwarded-for'), server.requestIP(req)?.address ?? null, process.env.TRUST_PROXY === '1');
+    const who = proxiedClient(process.env.PROXY_SECRET ?? '', req.headers.get('x-relay-proxy'), req.headers.get('x-client-ip'),
+      clientKey(req.headers.get('x-forwarded-for'), server.requestIP(req)?.address ?? null, process.env.TRUST_PROXY === '1'));
     try {
       if (url.pathname === '/health') return json({ ok: true, contract: contractId, relayer: relayer.accountId });
       if (limited(who)) return json({ error: 'slow down' }, 429);

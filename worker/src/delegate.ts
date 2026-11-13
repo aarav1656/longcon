@@ -59,6 +59,13 @@ export function clientKey(xff: string | null, socketIp: string | null, trustProx
   return trustProxy ? (xff?.split(',').at(-1)?.trim() || socketIp || 'unknown') : socketIp ?? 'unknown';
 }
 
+/** Behind the Pages proxy every request arrives from one edge address, so the proxy forwards the browser's address under a shared secret; anything without the secret keeps the normal key. */
+export function proxiedClient(secret: string, proxyHeader: string | null, forwarded: string | null, fallback: string): string {
+  const ok = secret.length >= 16 && proxyHeader !== null && proxyHeader.length === secret.length
+    && Array.from(secret).reduce((d, c, i) => d | (c.charCodeAt(0) ^ proxyHeader.charCodeAt(i)), 0) === 0;
+  return ok && forwarded ? `proxied:${forwarded.trim().slice(0, 64)}` : fallback;
+}
+
 export function budgets(perClient: number, global: number, windowMs: number) {
   const clients = new Map<string, number[]>();
   const all: number[] = [];

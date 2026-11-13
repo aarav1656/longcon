@@ -197,7 +197,7 @@ function render() {
 }
 
 async function onboard() {
-  onboardFailed = false; notice = null;
+  onboardFailed = false; notice = null; onboardTry = 0;
   const ATTEMPTS = 6;
   let last = '';
   for (let k = 1; k <= ATTEMPTS && !ready; k++) {
@@ -210,7 +210,8 @@ async function onboard() {
       }
       ready = true;
     } catch (e) {
-      last = (e as Error).message;
+      const m = (e as Error).message;
+      last = m.length > 60 || m.includes('<') ? 'the relay did not answer' : m;
       if (k < ATTEMPTS) await nap(Math.min(1500 * k, 6000));
     }
   }

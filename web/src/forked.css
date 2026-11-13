@@ -130,3 +130,23 @@
 .fork .btn.green:disabled { filter: none; opacity: .75; }
 .fverdict[hidden] { display: none; }
 @media (max-width: 520px) { .fchartbox { width: 52%; } .pursebar b { font-size: 20px; } }
+
+.fdeck { text-wrap: balance; }
+.fdelta { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 6px 0 10px; text-align: center; }
+.fdelta .fd { display: grid; gap: 2px; padding: 6px 8px; background: var(--navy-2, #1b2036); box-shadow: 0 0 0 2px var(--navy-3, #2a3150); }
+.fdelta .fd b { font-size: 40px; line-height: 1; }
+.fdelta .fd.up { box-shadow: 0 0 0 3px var(--green-2, #5fbf6a); }
+.fdelta .fd.up b { color: var(--green-2, #5fbf6a); }
+.fdelta .fd.down { box-shadow: 0 0 0 3px #c9574f; }
+.fdelta .fd.down b { color: #e57a70; }
+.fdelta .fgap { display: grid; gap: 2px; max-width: 200px; }
+.fdelta .fgap b { font-size: 52px; line-height: 1; color: var(--gold); }
+@media (max-width: 520px) {
+  .fdelta { gap: 6px; }
+  .fdelta .fd b { font-size: 30px; }
+  .fdelta .fgap b { font-size: 36px; }
+  .fdelta .fgap { max-width: 96px; font-size: 11px; }
+  .controls .btns { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .controls .btn.big { font-size: 14px; padding-inline: 6px; white-space: normal; line-height: 1.1; min-width: 0; }
+  .controls .btn.big small, .controls .btn .tagb { display: block; }
+}

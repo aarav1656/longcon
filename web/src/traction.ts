@@ -104,11 +104,26 @@ export function tractionEvents(transactions: any[], contractId: string, finalize
   return [...events.values()].sort((a, b) => a.block_height - b.block_height || a.event.localeCompare(b.event));
 }
 
-export async function readTraction(contractId = TRACTION_CONTRACT): Promise<Traction> {
-  return (await readTractionEvents(contractId)).summary;
+export async function readTraction(contractId = TRACTION_CONTRACT, prior?: TractionState, onProgress?: (state: TractionState) => void | Promise<void>): Promise<Traction> {
+  return (await readTractionEvents(contractId, prior, onProgress)).summary;
 }
 
-export async function readTractionEvents(contractId = TRACTION_CONTRACT): Promise<{ summary: Traction; events: TractionEvent[] }> {
+export interface TractionState { seen: string[]; events: TractionEvent[] }
+
+function summarize(contractId: string, finalizedHeight: number, events: TractionEvent[]): Traction {
+  return { contract_id: contractId, finalized_height: finalizedHeight,
+    pitches: events.filter((event) => event.event === 'offer_opened').length,
+    loans: events.filter((event) => event.event === 'offer_settled').length,
+    defaults: events.filter((event) => event.event === 'con_landed').length };
+}
+
+/**
+ * Reads the contract's finalized event history. Receipts at or below the finalized height never change, so a prior
+ * state lets a refresh fetch only transactions it has not seen; `onProgress` receives the state after every batch so
+ * a rate limit mid-way keeps what was read.
+ */
+export async function readTractionEvents(contractId = TRACTION_CONTRACT, prior: TractionState = { seen: [], events: [] },
+  onProgress?: (state: TractionState) => void | Promise<void>): Promise<{ summary: Traction; events: TractionEvent[]; state: TractionState }> {
   const head = await post<{ result?: { header?: { height?: number } }; error?: unknown }>(RPC, {
     jsonrpc: '2.0', id: 'longcon-traction', method: 'block', params: { finality: 'final' },
   });
@@ -125,19 +140,20 @@ export async function readTractionEvents(contractId = TRACTION_CONTRACT): Promis
     if (next && next === resumeToken) throw new Error('event history pagination stopped advancing');
     resumeToken = next;
   } while (resumeToken);
-  const transactions: any[] = [];
-  const allHashes = [...hashes];
-  for (let i = 0; i < allHashes.length; i += 20) {
-    const result = await post<{ transactions?: any[] }>(`${INDEXER}/v0/transactions`, { tx_hashes: allHashes.slice(i, i + 20) });
+  const seen = new Set(prior.seen);
+  const merged = new Map<string, TractionEvent>(prior.events.map((e) => [`${e.event}:${e.record_id ?? e.offer_id}`, e]));
+  const todo = [...hashes].filter((h) => !seen.has(h));
+  for (let i = 0; i < todo.length; i += 20) {
+    const batch = todo.slice(i, i + 20);
+    const result = await post<{ transactions?: any[] }>(`${INDEXER}/v0/transactions`, { tx_hashes: batch });
     if (!Array.isArray(result.transactions)) throw new Error('transaction history response is missing transactions');
-    transactions.push(...result.transactions);
+    for (const e of tractionEvents(result.transactions, contractId, finalizedHeight)) merged.set(`${e.event}:${e.record_id ?? e.offer_id}`, e);
+    // a transaction above the finalized height is read again next time
+    for (const tx of result.transactions) if (tx.transaction?.hash && batch.includes(tx.transaction.hash) && !(tx.receipts ?? []).some((r: any) => Number(r.receipt?.block_height ?? r.execution_outcome?.block_height) > finalizedHeight)) seen.add(tx.transaction.hash);
+    await onProgress?.({ seen: [...seen], events: [...merged.values()] });
   }
-  const events = tractionEvents(transactions, contractId, finalizedHeight);
-  const summary = { contract_id: contractId, finalized_height: finalizedHeight,
-    pitches: events.filter((event) => event.event === 'offer_opened').length,
-    loans: events.filter((event) => event.event === 'offer_settled').length,
-    defaults: events.filter((event) => event.event === 'con_landed').length };
-  return { summary, events };
+  const events = [...merged.values()].sort((a, b) => a.block_height - b.block_height || a.event.localeCompare(b.event));
+  return { summary: summarize(contractId, finalizedHeight, events), events, state: { seen: [...seen], events } };
 }
 
 export async function loadTraction(): Promise<Traction> {
@@ -145,7 +161,9 @@ export async function loadTraction(): Promise<Traction> {
     cache: 'no-store', signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`activity endpoint returned ${response.status}`);
-  return response.json() as Promise<Traction>;
+  const body = await response.json() as Traction & { pending?: boolean };
+  if (body.pending) throw new Error('event history is still being read');
+  return body;
 }
 
 export function renderTraction(data: Traction): string {

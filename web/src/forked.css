@@ -153,3 +153,9 @@
 
 .retry{margin:.5rem 0 0}
 .retry .btn{min-width:8rem}
+.fsigned { margin: 8px 0 4px; border: 2px solid var(--gold); padding: 6px 10px 8px; background: rgba(0,0,0,.25); }
+.fsigned .fk { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 4px; }
+.fsigned ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 14px; }
+.fsigned li { font-size: 13px; line-height: 1.3; min-width: 0; }
+.fsigned li b { color: var(--gold); margin-right: 4px; }
+.fsigned q { display: block; opacity: .8; font-size: 12px; quotes: none; overflow-wrap: anywhere; }

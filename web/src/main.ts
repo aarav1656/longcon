@@ -316,7 +316,7 @@ function renderStage() {
       else if (o.status === 'refused') sfx.refused();
       else sfx.seal();
       $('#stage').classList.remove('shake'); void $('#stage').offsetWidth; $('#stage').classList.add('shake');
-      requestAnimationFrame(() => $('#verdict').scrollIntoView({ block: 'end', behavior: 'smooth' }));
+      requestAnimationFrame(() => $('#queue').scrollIntoView({ block: 'start', behavior: 'smooth' }));
     }
     seenOutcome = o.id;
   }
@@ -651,7 +651,7 @@ async function refreshRound() {
   if (round.ids.length === 0) { round.phase = round.opening ? 'opening' : 'none'; return; }
   // the queue was sealed: follow its batch to the answer
   if (round.batch === null) {
-    const first = round.offers.get(round.ids[0]) ?? await chain.view<QOffer>('offer_by_id', { offer_id: round.ids[0] });
+    const first = await chain.view<QOffer>('offer_by_id', { offer_id: round.ids[0] });
     const sealed = first.batch;
     if (sealed === null) return;
     round.batch = sealed;

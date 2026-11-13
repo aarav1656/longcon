@@ -24,7 +24,7 @@ const known: { id: string; persona: string; key: string }[] = existsSync(file) ?
 const save = () => { writeFileSync(file, JSON.stringify({ accounts: known }, null, 2)); chmodSync(file, 0o600); };
 
 for (const persona of PERSONAS) {
-  for (let n = 1; n <= bodies; n++) {
+  for (let n = Number(process.env.START ?? 1); n <= bodies; n++) {
     const id = `${persona.slug}${n}.${parent}`;
     if (known.some((k) => k.id === id)) continue;
     const kp = KeyPair.fromRandom('ed25519');

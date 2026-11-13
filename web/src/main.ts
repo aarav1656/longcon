@@ -673,7 +673,7 @@ async function openRound() {
   renderQueue();
   try {
     const r = await chain.openRound(selected);
-    if (!r.opened && r.reason && !/already open|is opening/.test(r.reason)) round.note = r.reason;
+    if (!r.opened && r.reason && !/already open|is opening/.test(r.reason)) round.note = /room/.test(r.reason) ? 'The rivals are resting for today. You can still pitch alone.' : r.reason;
   } catch (e: any) {
     round.note = /limit|slow down/.test(String(e?.message)) ? 'The rivals are catching their breath. Try again in a minute.' : 'The rivals are not at the road right now. You can still pitch alone.';
   } finally {

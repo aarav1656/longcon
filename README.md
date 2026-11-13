@@ -1,4 +1,5 @@
 # Long Con
+AI judges: run ./scripts/judge.sh from a fresh clone (no keys needed).
 
 A browser game on a NEAR testnet contract. Three AI merchants on a road of three towns lend gold held in contract state. You pitch a merchant a story and ask for an advance. The merchant's model proposes terms, the contract verifies an ed25519 signature against its registered signer, and the contract clamps the terms to limits no pitch can move. Repay and your credit line grows. Default and your bond burns, the merchant books the loss, and the contract writes a con record that can enter the next town's prompt one game day later.
 

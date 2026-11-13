@@ -71,7 +71,7 @@ if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
 ' "$missing"
 else
   account_body=$(printf '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_account","finality":"final","account_id":"%s"}}' "$account")
-  if account_json=$(rpc_post "$account_body") && jq -e '.result.code_hash | test("^[0-9a-f]{64}$") and . != "11111111111111111111111111111111"' >/dev/null 2>&1 <<<"$account_json"; then
+  if account_json=$(rpc_post "$account_body") && jq -e '.result.code_hash | type == "string" and length > 20 and . != "11111111111111111111111111111111"' >/dev/null 2>&1 <<<"$account_json"; then
     printf 'PASS live deployed contract code: %s
 ' "$account"
     pass=$((pass + 1))

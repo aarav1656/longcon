@@ -95,7 +95,6 @@ Bun.serve({
         const { account_id, merchant } = (await req.json()) as { account_id: string; merchant: number };
         if (!/^[0-9a-f]{64}$/.test(account_id) || ![0, 1, 2].includes(merchant)) return json({ error: 'round takes your 64 hex account and a stall 0 to 2' }, 400);
         if (rivals.size === 0) return json({ error: 'the rival grifters are not at the road yet' }, 503);
-        if (!(await view(p, contractId, 'player', { account_id }))) return json({ error: 'join the road before you open a round' }, 400);
         if (opening.has(merchant)) return json({ ok: true, merchant, opened: false, offers: [], reason: 'a round is opening at this stall' });
         if (!roundBudget.take(who)) return json({ error: 'round limit reached for now' }, 429);
         opening.add(merchant);

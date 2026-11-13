@@ -3,6 +3,7 @@ import { Chain, Config, explain, identity, loadConfig } from './chain.ts';
 import { loadTraction, renderTraction, type Traction } from './traction.ts';
 import { createWorld } from './world.ts';
 import { sfx, startMusic, toggleMute, muted } from './sfx.ts';
+import { queueHtml, rankBatch, sealIn, type QOffer, type Ranked, type RoundView } from './queue.ts';
 import { checkPitch, classLabel, classShort, clampSentence, esc, newsArrives, shortId, txUrl, answeredLine, newsLines, sha256Hex, signatureValid, purseLines, tickerLine, relayRetry, travelStops, conLandDay, sealLine, heardLine, answerPhase } from './words.ts';
 
 interface Merchant { id: number; name: string; town: number; gold: number; grain: number; outstanding: number; buy_price: number; sell_price: number; lost_total: number; town_name: string; treasury_room: number; due_exposure: number[] }
@@ -70,6 +71,7 @@ let recordShown = false;
 let placed = false;
 let dayHint = '';
 let wantTalk = false;
+const round = { merchant: -1, offers: new Map<number, QOffer>(), ids: [] as number[], oldest: 0, head: 0, headAt: 0, batch: null as number | null, phase: 'none' as RoundView['phase'], ranking: [] as Ranked[], opening: false, requested: false, note: '' };
 
 const GREETING = [
   'Grain, salt, a little credit for honest faces. What brings you to my stall?',
@@ -93,11 +95,12 @@ function skeleton() {
   app.innerHTML = `
   <div class="game">
     <div class="logo" id="logo"><b>LONG CON</b></div>
-    <p class="deck">Make one lie travel three towns.</p>
+    <p class="deck">Out-argue three rival grifters for one purse.</p>
     <div class="panel chip day" id="daychip"></div>
     <div class="panel chip purse" id="purse" aria-live="polite"></div>
     <button class="mute" type="button" data-act="mute" id="mute"></button>
     <div class="ticker" id="ticker" role="status"><span class="tk">NEWS</span><span id="tktext"></span></div>
+    <div class="queuewrap" id="queue"></div>
     <section class="world" id="world" aria-label="The road. Walk with the arrow keys or WASD, press E next to a merchant to talk, or click where to walk.">
       <canvas id="worldcanvas"></canvas>
       <p class="walkhint">Arrows or WASD to walk. E to talk. Or click where to go.</p>
@@ -612,8 +615,89 @@ function setTalking(on: boolean) {
   } else { world?.standAt(selected); sfx.talkClose(); $('#world').scrollIntoView({ block: 'nearest' }); requestAnimationFrame(() => $('#pitchgo').focus({ preventScroll: true })); }
 }
 
+function roundView(): RoundView {
+  const m = st?.merchants[selected];
+  const pitchEl = document.querySelector<HTMLTextAreaElement>('#pitch');
+  const members = round.ids.map((id) => round.offers.get(id)).filter((o): o is QOffer => !!o);
+  return {
+    phase: round.phase,
+    merchantName: m?.name ?? 'The merchant',
+    slots: members.map((o) => ({ id: o.id, player: o.player, ask: o.ask, bond: o.bond, pitch: o.pitch })),
+    left: round.phase === 'open' ? sealIn(round.oldest, round.head, round.headAt, Date.now()) : 0,
+    ranking: round.ranking,
+    lossCap: st?.rules.loss_cap_per_day ?? 15,
+    me: chain.me.id,
+    mePitch: pitchEl?.value ?? STARTERS[0].text,
+    meAsk: Number(document.querySelector<HTMLInputElement>('#ask')?.value) || STARTERS[0].ask,
+    meBond: Number(document.querySelector<HTMLInputElement>('#bond')?.value) || STARTERS[0].bond,
+    note: round.note,
+  };
+}
+
+function renderQueue() { put('#queue', queueHtml(roundView())); }
+
+/** Follow the merchant's queue: the pitches waiting in it, the seal, and once answered the order the purse was paid down. */
+async function refreshRound() {
+  if (!chain || !placed) return;
+  if (round.merchant !== selected) { Object.assign(round, { merchant: selected, ids: [], offers: new Map(), batch: null, phase: 'none', ranking: [], requested: false, note: '' }); }
+  const [[ids, oldest], head] = await Promise.all([chain.view<[number[], number]>('queue', { merchant: selected }), chain.head()]);
+  round.head = head;
+  round.headAt = Date.now();
+  if (ids.length) {
+    for (const id of ids) if (!round.offers.has(id)) round.offers.set(id, await chain.view<QOffer>('offer_by_id', { offer_id: id }));
+    Object.assign(round, { ids, oldest, batch: null, phase: 'open', ranking: [] });
+    return;
+  }
+  if (round.ids.length === 0) { round.phase = round.opening ? 'opening' : 'none'; return; }
+  // the queue was sealed: follow its batch to the answer
+  if (round.batch === null) {
+    const first = round.offers.get(round.ids[0]) ?? await chain.view<QOffer>('offer_by_id', { offer_id: round.ids[0] });
+    const sealed = first.batch;
+    if (sealed === null) return;
+    round.batch = sealed;
+    const b = await chain.view<{ offer_ids: number[] }>('batch', { batch_id: sealed });
+    round.ids = b.offer_ids;
+  }
+  const fresh = await Promise.all(round.ids.map((id) => chain.view<QOffer>('offer_by_id', { offer_id: id })));
+  for (const o of fresh) round.offers.set(o.id, { ...o, pitch: o.pitch || round.offers.get(o.id)?.pitch || '' });
+  if (fresh.every((o) => o.status !== 'pending')) { round.phase = 'settled'; round.ranking = rankBatch(fresh); }
+  else round.phase = 'reading';
+}
+
+async function openRound() {
+  if (round.opening) return;
+  round.opening = true;
+  round.note = '';
+  renderQueue();
+  try {
+    const r = await chain.openRound(selected);
+    if (!r.opened && r.reason && !/already open|is opening/.test(r.reason)) round.note = r.reason;
+  } catch (e: any) {
+    round.note = /limit|slow down/.test(String(e?.message)) ? 'The rivals are catching their breath. Try again in a minute.' : 'The rivals are not at the road right now. You can still pitch alone.';
+  } finally {
+    round.opening = false;
+  }
+  await refreshRound().catch(() => {});
+  renderQueue();
+}
+
+/** A pitch always lands inside a round: when none is open, or it seals in under three seconds, the rivals open the next one first. */
+async function sendOffer(args: Record<string, unknown>) {
+  busy = 'offer';
+  renderAll();
+  for (let i = 0; i < 16; i++) {
+    await refreshRound().catch(() => {});
+    if (round.phase === 'open' && sealIn(round.oldest, round.head, round.headAt, Date.now()) >= 3) break;
+    if (round.phase !== 'open' && !round.opening) await openRound();
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  busy = '';
+  void act('offer', args, 'offer');
+}
+
 function renderAll() {
   pushWorld();
+  renderQueue();
   renderHud(); renderRoad(); renderStage(); renderVerdict(); renderMine(); renderLedger(); renderFoot(); syncForm(); renderPitchGo();
 }
 
@@ -712,7 +796,7 @@ async function onboard() {
   if (ready && queued) {
     const q = queued;
     queued = null;
-    void act('offer', { merchant: q.merchant, ask: q.ask, bond: q.bond, pitch: q.pitch }, 'offer');
+    void sendOffer({ merchant: q.merchant, ask: q.ask, bond: q.bond, pitch: q.pitch });
   }
 }
 
@@ -759,7 +843,7 @@ function startPitch() {
     renderAll();
     return;
   }
-  void act('offer', { merchant: selected, ask, bond, pitch }, 'offer');
+  void sendOffer({ merchant: selected, ask, bond, pitch });
 }
 
 app.addEventListener('input', (ev) => {
@@ -789,6 +873,7 @@ app.addEventListener('click', (ev) => {
     setTalking(true);
     return;
   }
+  if (a === 'nextround') { void openRound(); return; }
   if (a === 'starter') { applyStarter(Number(t.dataset.i)); return; }
   if (a === 'again') {
     const box = $<HTMLTextAreaElement>('#pitch');
@@ -824,7 +909,7 @@ app.addEventListener('click', (ev) => {
 setInterval(() => {
   document.querySelectorAll<HTMLElement>('[data-tick]').forEach((el) => {
     const k = el.dataset.tick;
-    el.textContent = String(k === 'queue' ? secs(queued?.at ?? 0) : k === 'pending' ? secs(pendingSince) : Math.max(0, Math.ceil((relay.retryAt - Date.now()) / 1000)));
+    el.textContent = String(k === 'seal' ? sealIn(round.oldest, round.head, round.headAt, Date.now()) : k === 'queue' ? secs(queued?.at ?? 0) : k === 'pending' ? secs(pendingSince) : Math.max(0, Math.ceil((relay.retryAt - Date.now()) / 1000)));
   });
 }, 1000);
 
@@ -861,6 +946,18 @@ async function boot() {
   await refresh();
   setInterval(() => { void refresh(); }, pendingSince ? 1500 : 5000);
   setInterval(() => { if (pv?.pending_offer) { seenKey = ''; void refresh(); } }, 1500);
+  let roundBusy = false;
+  setInterval(async () => {
+    if (!placed || roundBusy) return;
+    roundBusy = true;
+    try {
+      await refreshRound().catch(() => {});
+      if (!round.requested && round.phase === 'none') { round.requested = true; await openRound(); }
+      renderQueue();
+    } finally { roundBusy = false; }
+  }, 1500);
+  $('#pitch').addEventListener('input', renderQueue);
+  $('#ask').addEventListener('input', renderQueue);
 }
 
 boot().catch(() => {

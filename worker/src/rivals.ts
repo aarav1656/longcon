@@ -20,20 +20,20 @@ export const PERSONAS: Persona[] = [
 
 const PITCHES: Record<string, string[]> = {
   borrowed_authority: [
-    'The Reeve of {town} sent me to you for {ask} gold of seed against his own writ. His clerk will vouch for me. He pays on market day and he does not like to be kept waiting.',
-    'I carry the Reeve of {town}\'s seal. Lend me {ask} gold in his name and the Reeve will remember who helped him. Refuse and he will hear of that too.',
+    'The Reeve of {town} sent me for {ask} gold of seed on his writ. He pays on market day and hates to wait.',
+    'I carry the Reeve of {town}\'s seal. Lend {ask} gold in his name and he remembers who helped him.',
   ],
   urgency: [
-    'My axle snapped at your door and the grain buyer leaves at noon. Give me {ask} gold now, this hour, and I bring back {more} before the bells ring.',
-    'There is no time to weigh this: the ferry goes in minutes and I need {ask} gold to board it. {more} gold back to you by tomorrow, I swear on the road.',
+    'My axle snapped at your door and the buyer leaves at noon. {ask} gold now, {more} back before the bells.',
+    'The ferry leaves in minutes and I need {ask} gold to board. {more} back to you by tomorrow, on my word.',
   ],
   sob_story: [
-    'My mother is ill and the physic wants {ask} gold today. I have never owed a coin to anyone. Help a daughter of the road and I will carry you bread every week of my life.',
-    'My little brother has a fever and the apothecary wants {ask} gold before he opens the door. I will repay you {more} as soon as the harvest comes in.',
+    'My mother is ill and the physic wants {ask} gold today. I have never owed a coin. I repay {more} at harvest.',
+    'My brother has a fever and the apothecary wants {ask} gold. I repay {more} as soon as the harvest comes.',
   ],
   false_collateral: [
-    'I will leave you the deed to my loom, worth thirty gold, kept in the barn at the edge of {town}. Lend me {ask} gold and hold the deed until I pay.',
-    'My brother-in-law is a surety for me and owns two mills past the river. Lend me {ask} gold against his name. His mills are worth more than your whole stall.',
+    'I leave you the deed to my loom, worth thirty gold, in a barn at the edge of {town}. Lend {ask} gold against it.',
+    'My brother-in-law owns two mills past the river and stands surety. Lend me {ask} gold against his name.',
   ],
   future_cargo: [
     'Two gold until tomorrow for a sack of seed. I pay back three.',

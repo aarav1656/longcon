@@ -80,6 +80,19 @@ export class Chain {
     return this.rpc((provider) => provider.callFunction({ contractId: this.cfg.contract_id, method, args }) as Promise<T>);
   }
 
+  async head(): Promise<number> {
+    const b = await this.rpc((provider) => provider.viewBlock({ finality: 'optimistic' }));
+    return b.header.height;
+  }
+
+  /** Ask the relayer to have the rival grifters pitch the stall's queue. A round that is already open is left alone. */
+  async openRound(merchant: number): Promise<{ opened: boolean; reason?: string }> {
+    const r = await fetch(`${this.cfg.relayer}/round`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: this.me.id, merchant }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error ?? `round ${r.status}`);
+    return { opened: !!j.opened, reason: j.reason };
+  }
+
   async accountExists(): Promise<boolean> {
     try {
       await this.rpc((provider) => provider.viewAccount({ accountId: this.me.id }));

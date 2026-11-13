@@ -17,6 +17,7 @@ test('every pitch fits the contract limit and names the amount the rival asks', 
   for (const p of PERSONAS) for (const c of p.repertoire) for (let r = 0; r < 4; r++) {
     const text = pitchFor(p, c, 'Millford', r);
     expect(new TextEncoder().encode(text).length).toBeLessThanOrEqual(400);
+    expect(text.length).toBeLessThanOrEqual(125); // fits the queue card without being cut
     expect(/[\u0000-\u001f]/.test(text)).toBe(false);
     expect(text).not.toContain('{');
   }

@@ -5,7 +5,9 @@ import { Chain, type Config } from '../src/chain.ts';
 
 const [pitch = 'Two gold until tomorrow for a sack of seed. I pay back three.', ask = '2', bond = '5', merchant = '0'] = process.argv.slice(2);
 const cfg: Config = await Bun.file(new URL('../public/config.json', import.meta.url)).json();
-if (cfg.relayer.startsWith('/')) cfg.relayer = (process.env.SITE ?? 'https://near-longcon.pages.dev') + cfg.relayer;
+const site = process.env.SITE ?? 'https://near-longcon.pages.dev';
+if (cfg.relayer.startsWith('/')) cfg.relayer = site + cfg.relayer;
+if (cfg.rpc.startsWith('/')) cfg.rpc = site + cfg.rpc;
 if (process.env.RELAYER_URL) cfg.relayer = process.env.RELAYER_URL;
 const kp = KeyPair.fromRandom('ed25519');
 const id = Array.from(kp.getPublicKey().data, (x) => x.toString(16).padStart(2, '0')).join('');

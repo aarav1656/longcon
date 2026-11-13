@@ -266,7 +266,7 @@ function renderHud() {
     ${due ? `<div class="k due">Your debt ${esc(names[due.merchant] ?? 'to the road')} due today</div>` : `<span class="daybar" title="${d.left > 0 ? `${d.left} s daylight left` : 'The day can end'}"><i style="width:${d.pct}%"></i></span>`}</div>`);
   const pl = purseLines(st?.rules.gold_stipend ?? null, pv, names);
   const sub = pl ? [...pl.sub.filter((x) => x.startsWith('owe')), ...pl.sub.filter((x) => !x.startsWith('owe'))].slice(0, 2) : [];
-  put('#purse', `<span class="ico coin"></span><div>${pl ? `<div class="v">${esc(pl.main)}</div>${sub.map((x) => `<div class="k">${esc(x)}</div>`).join('')}` : `<div class="v">${skel(64, 'Reading your purse')}</div>`}</div>`);
+  put('#purse', `<span class="ico coin"></span><div>${pl ? `<div class="v">${esc(pl.main.replace(/ waiting$/, ''))}${pl.main.endsWith(' waiting') ? '<span class="wait"> waiting</span>' : ''}</div>${sub.map((x) => `<div class="k">${esc(x)}</div>`).join('')}` : `<div class="v">${skel(64, 'Reading your purse')}</div>`}</div>`);
   const gold = pv?.gold ?? -1;
   if (lastGold >= 0 && gold >= 0 && gold !== lastGold) flashUntil = Date.now() + 1400;
   if (gold >= 0) lastGold = gold;
@@ -420,7 +420,7 @@ function dayControl(o: Offer, oc: Outcome, status?: string): string {
   if (!st || status === 'repaid') return '';
   const stops = travelStops(conLandDay(oc.due_day), st.merchants[o.merchant]?.town ?? 0, st.rules.towns, st.day);
   if (stops.every((s) => s.heard)) return '';
-  return `<div class="actions"><button class="btn small" type="button" data-act="endday" ${ready && !busy ? '' : 'disabled'}><span class="ico s moon"></span>End day ${st.day}</button>
+  return `<div class="actions"><button class="btn small" type="button" data-act="endday" ${ready && !busy ? '' : 'disabled'}><span class="ico s moon"></span>End day <b class="num">${st.day}</b></button>
     <span class="fine">${esc(dayHint || 'Unpaid debts default when their day ends, and the news starts to travel.')}</span></div>`;
 }
 
@@ -531,7 +531,7 @@ function renderMine() {
       <div class="r"><span class="main"><span class="ico s scroll"></span><span><b>${d.repay}</b> gold to ${esc(st?.merchants[d.merchant]?.name ?? '')}, due end of day ${d.due_day}. Bond ${d.bond}.</span></span>
       <button class="btn small green" data-act="repay" data-d="${d.id}" ${pv && pv.gold >= d.repay && day <= d.due_day && !busy ? '' : 'disabled'} type="button">Pay back</button></div>`).join('')}</div>`
       : '<p class="empty">No open debts. Take an advance and it shows here with its due day.</p>'}
-    <div class="endrow"><button class="btn big" data-act="endday" type="button" ${canEnd ? '' : 'disabled'}><span class="ico s ${endsIn > 0 ? 'sun' : 'moon'}"></span>${endsIn > 0 ? `Day ${day} ends in ${endsIn}s` : `End day ${day}`}</button>
+    <div class="endrow"><button class="btn big" data-act="endday" type="button" ${canEnd ? '' : 'disabled'}><span class="ico s ${endsIn > 0 ? 'sun' : 'moon'}"></span>${endsIn > 0 ? `Day <b class="num">${day}</b> ends in <b class="num">${endsIn}</b> s` : `End day <b class="num">${day}</b>`}</button>
       <span class="hint">Debts due today default when the day ends.</span></div>
     ${m ? `<h3>Trade grain with ${esc(m.name)}</h3>
     <div class="trade"><div class="well"><input id="qty${selected}" type="number" min="1" value="${qtys[selected]}" aria-label="Grain to trade with ${esc(m.name)}"></div>

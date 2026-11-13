@@ -490,3 +490,5 @@ h3 .num, .stamp span, .chip .v { font-family: var(--font); font-weight: 700; }
   .choices .btn::before { display: none; }
   .face .say { font-size: 14px; }
 }
+.btn b.num { font-family: var(--font); }
+@media (max-width: 700px) { .chip .v .wait { display: none; } .logo b { font-size: 21px; } }

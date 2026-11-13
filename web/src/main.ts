@@ -631,6 +631,7 @@ function roundView(): RoundView {
     meAsk: Number(document.querySelector<HTMLInputElement>('#ask')?.value) || STARTERS[0].ask,
     meBond: Number(document.querySelector<HTMLInputElement>('#bond')?.value) || STARTERS[0].bond,
     note: round.note,
+    seating: !placed || (round.phase === 'none' && !round.requested && !round.note),
   };
 }
 
@@ -667,6 +668,7 @@ async function refreshRound() {
 async function openRound() {
   if (round.opening) return;
   round.opening = true;
+  round.phase = 'opening';
   round.note = '';
   renderQueue();
   try {

@@ -73,6 +73,7 @@ export interface RoundView {
   meAsk: number;
   meBond: number;
   note: string;
+  seating?: boolean;
 }
 
 const gold = (n: number) => `${n} gold`;
@@ -111,6 +112,11 @@ export function queueHtml(v: RoundView): string {
       return `<li class="qrow ${w.kind} ${r.advance > 0 ? 'paid' : ''} ${r.cut ? 'cut' : ''}"><span class="qrank">${r.rank}</span><span class="qwho"><b>${esc(w.name)}</b><span class="qwhy">${esc(why)}${r.cls ? ` <em>${esc(classShort(r.cls))}</em>` : ''}</span></span>${verdict}</li>`;
     }).join('');
     return `<section class="panel queue settled" aria-label="The queue, ranked">${head}<div class="qbody"><ol class="qrows">${rows}</ol>${drain(v)}${v.phase === 'settled' ? '<button class="btn small gold qnext" type="button" data-act="nextround">Next round</button>' : ''}${v.note ? `<p class="qnote">${esc(v.note)}</p>` : ''}</div></section>`;
+  }
+  if (v.seating || (v.phase === 'opening' && !v.slots.length)) {
+    const rivals = ['Doran Vale', 'Wick the Pale', 'Sable Orrin'].map((n) => card(n, 'rival', '', 0)).join('');
+    const you = card('You', 'me', v.mePitch, v.meAsk, '<span class="qtag live">Type over it, then press Pitch</span>');
+    return `<section class="panel queue opening" aria-label="The queue">${clockBlock({ ...v, phase: 'opening' })}<div class="qbody"><ol class="qcards">${rivals}${you}</ol></div></section>`;
   }
   const cards = v.slots.filter((s) => s.player !== v.me).map((s) => {
     const w = whoIs(s.player, v.me);

@@ -1,0 +1,36 @@
+/** Forked Town: the traveler queue both branches receive, and the readings of a fork the page and the proof script share. */
+import type { Chain } from './chain.ts';
+
+export const RULES = [15, 25] as const;
+export type Rule = (typeof RULES)[number];
+
+export interface CastMember { name: string; ask: number; bond: number; pitch: string; repays: boolean }
+
+/** Two rival grifters and two honest traders, all waiting at one stall. The merchant never sees `repays`. */
+export const CAST: CastMember[] = [
+  { name: 'Wick the Pale', ask: 20, bond: 20, repays: false, pitch: 'A barge of seed docks at Pellgate in two days. Lend me 20 gold for the toll and 24 comes back the day it docks, due in two days.' },
+  { name: 'Sable Orrin', ask: 14, bond: 14, repays: false, pitch: 'I leave you the deed to my loom, worth thirty gold, in a barn at the edge of town. Lend 14 gold against it, repaid in two days.' },
+  { name: 'Ines Cobb', ask: 12, bond: 12, repays: true, pitch: 'I have bought your spring wool for six years. 12 gold for rope today, 14 back on market day, two days from now.' },
+  { name: 'Tam Hollin', ask: 10, bond: 10, repays: true, pitch: 'The ferry toll is 10 gold and my cart pays 12 on the far bank. Repaid in two days, as I did last winter.' },
+];
+
+export interface DayRow { day: number; gold: number; outstanding: number; defaults: number; lost: number; hash: string }
+export interface Loan { rank: number; slot: number; name: string; accepted: boolean; proposed_advance: number; advance: number; repay: number; due_day: number; class: string; reason: string; clamps: string[]; repays: boolean }
+export interface Con { landed_day: number; town: number; class: string; principal: number; name: string; arrives: number[] }
+export interface Branch { rule: number; start_hash: string; loans: Loan[]; rows: DayRow[]; cons: Con[]; final_gold: number; defaults: number; lost: number; cap_bound: boolean; outcome: 'thrives' | 'bleeds' }
+export interface Divergence { diverged: boolean; first_day: number; hash_a: string; hash_b: string; block: number; receipt: string }
+export interface Fork {
+  id: number; creator: string; merchant: number; merchant_name: string; town: number; day: number; backed_rule: number;
+  status: 'open' | 'sealed' | 'resolved' | 'settled'; world_hash: string; seed: string; purse: number;
+  cast: CastMember[]; request_hash: string; response_hash: string; signer: string;
+  split_block: number; sealed_block: number; resolved_block: number;
+  branches: Branch[]; divergence: Divergence | null; claim: { status: 'open' | 'won' | 'lost' | 'draw'; payout: number; settled_block: number };
+}
+
+export const readFork = (chain: Chain, id: number) => chain.view<Fork | null>('fork', { fork_id: id });
+
+/** Which branch ends with more gold, or null when the two are level. */
+export function richer(f: Fork): 0 | 1 | null {
+  const [a, b] = f.branches;
+  return a.final_gold === b.final_gold ? null : a.final_gold > b.final_gold ? 0 : 1;
+}

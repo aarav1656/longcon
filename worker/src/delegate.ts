@@ -2,7 +2,7 @@ import { SCHEMA, PublicKey, actions as A, encodeDelegateAction } from 'near-api-
 import { deserialize } from 'borsh';
 import { createHash } from 'node:crypto';
 
-export const ALLOWED = new Set(['join', 'offer', 'trade', 'repay_debt', 'advance_day']);
+export const ALLOWED = new Set(['join', 'offer', 'trade', 'repay_debt', 'advance_day', 'fork_town', 'fork_rule', 'fork_seal', 'fork_settle']);
 export const MAX_GAS = 200_000_000_000_000n;
 
 export interface Checked {

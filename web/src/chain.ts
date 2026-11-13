@@ -40,7 +40,18 @@ export const GAS: Record<string, bigint> = {
   repay_debt: 100_000_000_000_000n,
   advance_day: 200_000_000_000_000n,
   offer: 150_000_000_000_000n,
+  fork_town: 100_000_000_000_000n,
+  fork_rule: 60_000_000_000_000n,
+  fork_seal: 100_000_000_000_000n,
+  fork_settle: 100_000_000_000_000n,
 };
+
+/** A relayed call the contract rejected: the sentence it wrote and the transaction that carries it. */
+export class ChainError extends Error {
+  constructor(message: string, readonly tx?: string) {
+    super(message);
+  }
+}
 
 export class Chain {
   readonly provider: JsonRpcProvider;
@@ -143,7 +154,7 @@ export class Chain {
       body: JSON.stringify({ signed_delegate: b64(encodeSignedDelegate(signedDelegate)) }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.ok === false) throw new Error(explain(j.error ?? `relay ${r.status}`));
+    if (!r.ok || j.ok === false) throw new ChainError(explain(j.error ?? `relay ${r.status}`), j.tx);
     return { tx: j.tx };
   }
 }

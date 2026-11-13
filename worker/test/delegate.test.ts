@@ -90,3 +90,15 @@ test('proxiedClient keys on the forwarded address only with the shared secret', 
   expect(proxiedClient('', '', '198.51.100.7', 'edge')).toBe('edge');
   expect(proxiedClient(secret, secret, null, 'edge')).toBe('edge');
 });
+
+for (const method of ['fork_town', 'fork_rule', 'fork_seal', 'fork_settle']) {
+  test(`relays the visitor's ${method} and nothing that moves the sealed answer`, async () => {
+    const { bytes } = await make({ method });
+    expect(vet(bytes, CONTRACT).method).toBe(method);
+  });
+}
+
+test('the relayer never submits the merchant answer on a visitor behalf', async () => {
+  const { bytes } = await make({ method: 'fork_resume' });
+  expect(() => vet(bytes, CONTRACT)).toThrow('is not relayed');
+});

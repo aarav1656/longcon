@@ -22,6 +22,8 @@ const MAX_BATCH = 8;
 const inflight = new Set<number>();
 const handled = new Set<number>();
 const sealing = new Set<number>();
+const forksHandled = new Set<number>();
+const FORK_ANSWER_MS = Number(process.env.FORK_ANSWER_MS ?? 90_000);
 let signatureFailures = 0;
 
 function log(o: object) {
@@ -79,6 +81,32 @@ async function handle(b: BatchView, head: number, oldestOffer: number) {
   log({ ev: 'resumed', batch: b.id, offers: b.offer_ids.length, kind: a.kind, llm_ms: a.llmMs, sig_ms: a.sigMs, resume_tx_ms: Date.now() - t1, total_ms: Date.now() - t0, attempts: a.attempts, tx: (res as any)?.transaction?.hash });
 }
 
+interface ForkView { id: number; request_hash: string; cast: unknown[] }
+
+/** A sealed fork is one request for two branches: the same signed answer resolves both, so it is fetched once. */
+async function handleFork(id: number) {
+  const t0 = Date.now();
+  const f = await view<ForkView>(p, contractId, 'fork', { fork_id: id });
+  const body: string = await view(p, contractId, 'fork_request', { fork_id: id });
+  if (sha256Hex(body) !== f.request_hash) throw new Error('fork request body does not hash to the request_hash on chain');
+  const a = await answer(cfg, body, f.cast.length, t0 + FORK_ANSWER_MS, (chatId, status) => log({ ev: 'attempt', fork: id, chat_id: chatId, status }));
+  const t1 = Date.now();
+  const res = await acc.callFunctionRaw({ contractId, methodName: 'fork_resume', args: { fork_id: id, response: a.response, signature: a.signature, kind: a.kind }, gas: 300_000_000_000_000n, deposit: 0n });
+  log({ ev: 'fork_resumed', fork: id, kind: a.kind, llm_ms: a.llmMs, sig_ms: a.sigMs, resume_tx_ms: Date.now() - t1, total_ms: Date.now() - t0, attempts: a.attempts, tx: (res as any)?.transaction?.hash });
+}
+
+async function tickForks() {
+  const open = await view<number[]>(p, contractId, 'open_forks');
+  for (const id of open) {
+    if (forksHandled.has(id)) continue;
+    forksHandled.add(id);
+    handleFork(id).catch((e) => {
+      forksHandled.delete(id);
+      log({ ev: 'fork_failed', fork: id, error: String(e?.message ?? e).slice(0, 300) });
+    });
+  }
+}
+
 async function tick() {
   const [pending, listed, block] = await Promise.all([
     view<Pending[]>(p, contractId, 'pending_offers'),
@@ -108,6 +136,7 @@ log({ ev: 'start', contract: contractId, model: cfg.model, base: cfg.baseUrl, si
 for (;;) {
   try {
     await tick();
+    await tickForks();
   } catch (e: any) {
     log({ ev: 'tick_error', error: String(e?.message ?? e).slice(0, 200) });
   }

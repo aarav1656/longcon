@@ -8,22 +8,21 @@ Built at NEAR HACKATHON. Tracks: games, security.
 
 Games that let you talk an AI into lending keep their rules on a private server. A player cannot tell whether the model refused or the house did. Long Con moves the lending rules into a contract: the model proposes, the contract decides, and a landed con becomes structured news that can enter the next town's prompt.
 
-## Make one lie travel three towns (live, no wallet, no install)
+## Out-argue three rival grifters for one purse (live, no wallet, no install)
 
 Open https://near-longcon.pages.dev/ in any browser. Every step below runs against the live testnet contract `longcon4-game.testnet`.
 
-1. **Do:** open the link. **See:** a pixel market road, the line "Make one lie travel three towns.", a news ticker written from the newest con on the ledger, and three town tabs that say how many cons each town has heard.
-2. **Do:** press the gold button `Pitch <merchant> gold` (it holds focus, so Enter works). **See:** the stall opens with the "Seed grain" pitch ready: "Two gold until tomorrow for a sack of seed. I pay back three."
-3. **Do:** press `Pitch <merchant>`. **See:** three named steps, `Opening your purse (the road pays gas)`, `Sending your pitch` with a link to your pitch transaction, and the merchant reading it with a seconds counter.
-4. **See, about 30 seconds after the page loaded:** `<merchant> lends you 2 gold`, the bars `You asked`, `<merchant> offered`, `The road allowed`, the repay terms, the line `Signed by Qwen3.8 model in sealed enclave. Checked in browser`, and the road your lie travels: `Pellgate day 146, Millford hears day 147, Oskmoor hears day 147`.
-5. **Do:** open `How answer checked`. **See:** the request and response hashes with copy buttons, the registered signer key matching the published attestation report, the TCB status, and your pitch transaction on nearblocks.
-6. **Do:** press `End day` under the road strip each time daylight runs out (days are 30 seconds), twice. **See:** the debt defaults, the ticker leads with `Your con landed in Pellgate. Millford hears it on day 147.`, the other two tabs read `your con, day 147`, and the strip turns gold town by town as the news arrives.
-7. **Do:** press `Back to the road`, then the tab of a town the news has reached (it reads `(has heard you)` on the pitch button) and pitch the same story. **See:** the merchant refuses the structure and the answer says `<town> has heard a cargo promise con landed on the road. A different kind of pitch gets a different answer.` The refusal is signed and checked like the first answer.
-8. **Verify on chain:** `near contract call-function as-read-only longcon4-game.testnet con_records json-args '{"from":0,"limit":5}' network-config testnet now`. **See:** the landed con with its class, town, day, principal and the request and response hashes. `news_at` with `{"merchant":1}` returns the same record for the next town once its day arrives.
+1. **Do:** open the link. **See:** a pixel market road, the line "Out-argue three rival grifters for one purse.", a news ticker written from the newest con on the ledger, and above the stall a queue strip: a seal clock, three funded rival grifters (Doran Vale, Wick the Pale, Sable Orrin) with their pitches already in, and your card.
+2. **Do:** type over your card or keep the starter, "Two gold until tomorrow for a sack of seed. I pay back three.", and press `Pitch <merchant> gold` (it holds focus, so Enter works). **See:** your card joins the queue as fourth and the clock runs down from about 23 seconds.
+3. **See, when the clock reaches zero:** the contract seals every pitch into one request it wrote itself, the merchant reads all four at once, and the panel turns into a ranked list: who was paid, in the order the model listed them, the drain bar of the merchant's daily loss cap, and the slot where the cap cut the purse off. About 45 seconds after the page loaded for a first visit.
+4. **Do:** open `How answer checked`. **See:** the request and response hashes with copy buttons, the registered signer key matching the published attestation report, the TCB status, and your pitch transaction on nearblocks.
+5. **Do:** press `Next round`. **See:** three new rival pitches written from what the road has heard; the rivals avoid the class of con the news already burned.
+6. **Do:** press `End day` under the road strip until the debt falls due. **See:** the debt defaults and the ticker leads with `Your con landed in <town>. <next town> hears it on day N.` The next town's merchant refuses that structure and its answer names the news.
+7. **Verify on chain:** `near contract call-function as-read-only longcon4-game.testnet offer_by_id json-args '{"offer_id":<id from the ranked list>}' network-config testnet now` returns the offer with the merchant's verdict, the clamps and the request and response hashes, and `... con_records json-args '{"from":0,"limit":5}' ...` returns the landed cons with class, town, day, principal and the request and response hashes.
 
-What no other entry in this field shows in its first minute: a lie you tell becomes a record on the road, the record travels one town per day, and the next merchant's answer is built from it. The ticker, the town tabs and the gold travel strip on the first screen are read from contract state.
+What the closest entries on the board do not show in their first minute: Bouncer is one visitor against one guard; Freysa, on Base, is one visitor against one model for a fixed pot; Nims and the other merchant-agent entries quote prices to one buyer at a time. In Long Con four arguments sit side by side in one request the contract authored and an attested enclave signed, the scarce thing is the merchant's gold under a daily loss cap, and the ranking is the model's trust, signed, so the order cannot be rigged after the fact. Every landed con then travels one town per day into the next merchant's prompt.
 
-Source for the page: `web/src/main.ts`. Check the proof panel's math yourself: `web/src/words.ts` (`signatureValid`, `travelStops`).
+Source for the page: `web/src/queue.ts` (the queue strip and ranked list), `web/src/main.ts`, `web/src/words.ts` (`signatureValid`, `travelStops`). The rival grifters: `worker/src/rivals.ts`.
 
 ## Read the ledger without playing
 
@@ -37,7 +36,7 @@ Start the ledger page with the commands below; it reads a contract directly from
 Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `wasm-opt` (binaryen 123), `bun` 1.4, `jq`, `python3`.
 
 1. Run the contract suite from a clean clone: `cargo test --workspace`.
-   See `test result: ok` for the unit tests and each sandbox binary. The suite currently contains 55 async sandbox tests across attestation, batch, clamps, guards, hardening, lifecycle, rumours and sybil. The sandbox runs the real wasm through real receipts.
+   See `test result: ok` for the unit tests and each sandbox binary. The suite currently contains 68 async sandbox tests and 26 contract unit tests across attestation, batch, clamps, guards, hardening, lifecycle, reputation, rumours and sybil. The sandbox runs the real wasm through real receipts.
 2. Run the client tests: `(cd worker && bun install && bun test ./test) && (cd web && bun install && bun test ./test)`.
    See `0 fail` twice.
 3. Build the contract wasm the tests and the deploy script use: `scripts/build-wasm.sh`.
@@ -82,7 +81,7 @@ Open it with `python3 -m http.server 8080 --directory web` and browse to `/?cont
 | Step | Where | What happens |
 |---|---|---|
 | Offer | `offer()` | The player's bond is escrowed and the call opens a NEAR yield (`promise_yield_create_with_id`, id = sha256(player, nonce)). A timeout refunds the bond. |
-| Batch | `seal_batch()` | Offers waiting at one merchant are frozen into a single request that the contract builds itself. Sealing opens after a 6 block window, so no caller can put one traveler alone in front of the merchant. The model weighs every pitch before any is decided. |
+| Batch | `seal_batch()` | Offers waiting at one merchant are frozen into a single request that the contract builds itself. Sealing opens after a 40 block window (about 23 seconds), so no caller can put one traveler alone in front of the merchant. The model weighs every pitch before any is decided. |
 | Answer | `npc_resume_batch()` | The worker POSTs the contract's exact bytes to the model endpoint, gets an ed25519 signature over `model:sha256(request):sha256(response)`, and relays it. `env::ed25519_verify` accepts the answer only for the request the contract built. The request carries the batch id and the block's random seed, so a signed answer fits exactly one batch, and only the owner and registered relayers deliver answers, so a player cannot choose among several signed samples. One altered byte is rejected and the yield stays open. |
 | Clamp | `on_terms()` | Advance is cut to bond plus earned line, 15 gold per merchant per due day, 30 percent of the merchant's capital, and the traveler's ask. Interest is held between 0 and 50 percent. Quotes keep every buy price below every sell price, so no grain round trip makes gold. |
 | Default | `advance_day()` | An unpaid debt defaults: the bond burns, the credit line it was lent against is taken back, the merchant books the loss, and a structured con record (class, town, day, amount, request and response hashes, merchant configuration hash) is written. Records hold no free text. Every recorded default also takes 25 percent off the credit line every merchant offers that account (up to 75 percent), so Pell prices a traveler by what Marta recorded. The `player` view shows `credit_line` and `credit_haircut_pct`, and `advance_day` emits a `reputation_changed` event. |

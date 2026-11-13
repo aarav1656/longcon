@@ -691,3 +691,14 @@ Read time: `2026-11-11T22:10:08.203Z`; finalized source height: `277274723`. Cou
 
 Counts at finalized height `277274723`: pitches `53`, loans `36`, defaults `36`.
 
+
+## The queue: one sealed request, a purse paid down the model's ranking
+
+| What | Value |
+|---|---|
+| Contract upgrade (40 block seal window, purse paid in the order the model lists) | deploy tx `ETWWUBwHWn8y2qiYStCEkVghVwFztMdnUrW6GgRCo9TU`, wasm sha256 `dacc0c36898ee068cb81daf9b90964b1f317a8b689b67607f53186258f1cf27a` |
+| Sealed round on the live road | `batch` read at finalized block `277515029`: batch `109`, merchant `0`, offers `[147,148,149,151]` (three rival grifters and one visitor, sealed at block `277510368`), request hash `960e55d7548b194019c9f8ff0145d24bc0fae4c7eefb0b8848f1ec5d7514d6d9`, response hash `60622b9d0d104748cd33de4e48b3a7602727c918bed811031ce251e2ffe82d36`, ed25519 signature `070548752eda4c9c4230f502849909e12762b3bc1fc63096e7a1a428f9df8eea76d1b240dc54b1f91a66fffb4c71d0c0fa9e2588acfd9021f850e3cd5be73e05` |
+| Read it yourself | `near contract call-function as-read-only longcon4-game.testnet batch json-args '{"batch_id":109}' network-config testnet now` |
+| Order is the model's | the visitor's slot was last in arrival order and first in the signed list; the debts were booked in list order (`batch::the_purse_is_paid_down_the_order_the_model_lists_not_the_order_of_arrival`, mutation M56 KILLED) |
+| Must-fail | a reordered answer pays nobody (`batch::an_answer_reordered_after_signing_is_rejected_and_pays_nobody`), batch N's answer cannot resolve batch N+1, a pitch after the seal cannot enter the sealed batch |
+| Rival grifters | accounts `doran1`, `wick1`, `sable1` (and `2`) under `longcon-worker.testnet`, each funded and joined on testnet; the relayer route `POST /round` opens a round with all three |

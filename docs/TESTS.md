@@ -7,16 +7,16 @@ Command: `cargo test --workspace --no-fail-fast` (the sandbox binaries build the
 | Binary | Async sandbox tests |
 |---|---|
 | unit (`contract`) | 26 |
-| attestation | 8 |
-| batch | 13 |
-| clamps | 11 |
+| attestation | 9 |
+| batch | 17 |
+| clamps | 13 |
 | guards | 7 |
 | hardening | 6 |
-| lifecycle | 7 |
+| lifecycle | 8 |
 | reputation | 2 |
-| rumours | 2 |
-| sybil | 2 |
-| total | 83 tests |
+| rumours | 3 |
+| sybil | 3 |
+| total | 94 tests |
 
 Sandbox test counts are from `grep -c '#[tokio::test]' tests/tests/*.rs`; contract unit test count is from `cargo test -p longcon --lib -- --list`.
 
@@ -83,6 +83,10 @@ Command: `python3 scripts/mutate.py` (one row: `python3 scripts/mutate.py M25`).
 | M53 | reputation: a recorded default lowers the credit line | `contract/src/rules.rs` | `reputation::pell_credit_line_reflects_marta_default` | test pell_credit_line_reflects_marta_default ... FAILED / thread 'pell_credit_line_reflects_marta_default' panicked at tests/tests/reputation.rs:39:5: / left: Number(20) / right: Number(15) / test result: FAILED. 0 passed; 1 failed | test pell_credit_line_reflects_marta_default ... ok / test result: ok. 1 passed | KILLED |
 | M54 | reputation: the commit clamp uses the reputation line | `contract/src/lib.rs` | `reputation::pell_credit_line_reflects_marta_default` | test pell_credit_line_reflects_marta_default ... FAILED / thread 'pell_credit_line_reflects_marta_default' panicked at tests/tests/reputation.rs:49:5: / left: Number(8) / right: Number(6) / test result: FAILED. 0 passed; 1 failed | test pell_credit_line_reflects_marta_default ... ok / test result: ok. 1 passed | KILLED |
 | M55 | npc_resume_batch: the loan decision event is emitted only after the signature verifies | `contract/src/lib.rs` | `attestation::loan_proof_rejects_replay_tamper_cross_merchant_and_expired_payload` | thread 'loan_proof_rejects_replay_tamper_cross_merchant_and_expired_payload' panicked at tests/tests/attestation.rs:177:5: / no decision event on a tampered payload / test result: FAILED. 0 passed; 1 failed | test loan_proof_rejects_replay_tamper_cross_merchant_and_expired_payload ... ok / test result: ok. 1 passed; 0 failed | KILLED |
+| M56 | resume: the purse is paid down the model's listed order | `contract/src/lib.rs` | `batch::the_purse_is_paid_down_the_order_the_model_lists_not_the_order_of_arrival` | KILLED in 22 s on the testbox (`python3 scripts/mutate.py M56`: arrival-order loop substituted, test red, guard restored, test green) |
+| Q01 | a reordered answer is rejected after signing and pays nobody | `contract/src/lib.rs` | `batch::an_answer_reordered_after_signing_is_rejected_and_pays_nobody` | sandbox: the signature covers the response bytes, so a swapped slot order fails verification |
+| Q02 | batch N's answer cannot resolve batch N+1 | `contract/src/lib.rs` | `batch::an_answer_signed_for_one_batch_cannot_resolve_the_next_batch` | sandbox: the request hash binds the batch, replay is refused |
+| Q03 | a pitch after the seal cannot enter the sealed batch | `contract/src/lib.rs` | `batch::a_pitch_that_arrives_after_the_seal_cannot_enter_the_sealed_batch` | sandbox: the late pitch opens the next queue |
 
 ## Signer path checks (client side)
 

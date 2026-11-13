@@ -19,10 +19,13 @@ const RPC = 'https://rpc.testnet.fastnear.com';
 const RPC_FALLBACKS = ['https://rpc.testnet.near.org', 'https://near-testnet.drpc.org'];
 export const TRACTION_CONTRACT = 'longcon4-game.testnet';
 
+const ATTEMPTS = 10;
+
 async function post<T>(url: string, body: unknown): Promise<T> {
   const candidates = url === RPC ? [RPC, ...RPC_FALLBACKS] : [url];
   let lastRateLimit = 'rate limited';
-  for (let attempt = 0; attempt < 6; attempt++) {
+  let retryAfterMs = 0;
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     for (const candidate of candidates) {
       const response = await fetch(candidate, {
         method: 'POST',
@@ -32,6 +35,7 @@ async function post<T>(url: string, body: unknown): Promise<T> {
       });
       if (response.status === 429) {
         lastRateLimit = `${candidate} returned HTTP 429`;
+        retryAfterMs = Math.max(retryAfterMs, Number(response.headers.get('retry-after') || 0) * 1000);
         continue;
       }
       if (!response.ok) throw new Error(`${candidate} returned ${response.status}`);
@@ -43,9 +47,10 @@ async function post<T>(url: string, body: unknown): Promise<T> {
       if (result.error) throw new Error(`${candidate} returned JSON-RPC error ${result.error.code ?? ''}: ${result.error.message ?? 'unknown error'}`);
       return result;
     }
-    if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
+    if (attempt < ATTEMPTS - 1) await new Promise((resolve) => setTimeout(resolve, Math.min(Math.max(250 * 2 ** attempt, retryAfterMs), 15_000)));
+    retryAfterMs = 0;
   }
-  throw new Error(`rate limit persisted after six attempts: ${lastRateLimit}`);
+  throw new Error(`rate limit persisted after ${ATTEMPTS} attempts: ${lastRateLimit}`);
 }
 
 function successful(outcome: any): boolean {

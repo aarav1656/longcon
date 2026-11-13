@@ -17,9 +17,14 @@ AUTH=(); [ -z "${NEAR_AI_API_KEY:-}" ] || AUTH=(-H "Authorization: Bearer $NEAR_
 nonce="$(head -c32 /dev/urandom | xxd -p -c64)"
 report="$(curl -fsS -m 60 "$BASE/attestation/report?model=$MODEL&provider=near&signing_algo=ed25519&nonce=$nonce" \
   ${AUTH[@]+"${AUTH[@]}"} -H 'x-no-aliasing: true')"
-state="$(curl -fsS -m 30 "$RPC" -H 'content-type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"call_function\",\"finality\":\"final\",\"account_id\":\"$C\",\"method_name\":\"state\",\"args_base64\":\"e30=\"}}" \
-  | jq -c '.result.result | implode | fromjson')"
+state=""
+for rpc in $RPC ${NEAR_RPC_FALLBACKS:-https://near-testnet.drpc.org https://rpc.testnet.near.org}; do
+  state="$(curl -fsS -m 30 "$rpc" -H 'content-type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"call_function\",\"finality\":\"final\",\"account_id\":\"$C\",\"method_name\":\"state\",\"args_base64\":\"e30=\"}}" \
+    | jq -ce '.result.result | implode | fromjson')" && [ -n "$state" ] && break
+  state=""
+done
+[ -n "$state" ] || { echo "no RPC upstream returned contract state for $C" >&2; exit 1; }
 jq -ne --argjson r "$report" --argjson s "$state" --arg n "$nonce" --arg m "$MODEL" '
   ($s.signers | map({key: .[0], value: .[1]}) | from_entries) as $reg
   | ($r.model_attestations | length) > 0

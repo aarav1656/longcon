@@ -76,10 +76,10 @@ PYDOC
     DIST=$(cd "$ROOT" && realpath "$2")
     [[ -f "$DIST/game.html" ]] || { echo "missing built page: $DIST/game.html" >&2; exit 1; }
     (cd "$ROOT/web" && bun test ./test/traction.test.ts)
-    expected=$(events)
     tmp=$(mktemp -d); server_pid=
     cleanup() { [[ -z "$server_pid" ]] || kill "$server_pid" 2>/dev/null || true; rm -rf "$tmp"; }
     trap cleanup EXIT
+    events >"$tmp/expected.json"
     (cd "$ROOT"; exec bun web/scripts/local-page-server.ts "$DIST" "$CONTRACT_ID") >"$tmp/server.log" 2>&1 & server_pid=$!
     for _ in {1..30}; do
       port=$(sed -nE 's/^READY ([0-9]+)$/\1/p' "$tmp/server.log" | tail -1)
@@ -91,14 +91,14 @@ PYDOC
     base="http://127.0.0.1:$port"
     curl -fsS "$base/game.html" -o "$tmp/game.html"
     curl -fsS "$base/api/traction?contract_id=$CONTRACT_ID" -o "$tmp/actual.json"
-    jq -e --argjson expected "$expected" '.contract_id == $expected.summary.contract_id and .pitches == $expected.summary.pitches and .loans == $expected.summary.loans and .defaults == $expected.summary.defaults' "$tmp/actual.json" >/dev/null
-    (cd "$ROOT/web" && TRACTION_PAYLOAD="$(jq -c .summary <<<"$expected")" bun -e '
+    jq -e --slurpfile e "$tmp/expected.json" '$e[0] as $expected | .contract_id == $expected.summary.contract_id and .pitches == $expected.summary.pitches and .loans == $expected.summary.loans and .defaults == $expected.summary.defaults' "$tmp/actual.json" >/dev/null
+    (cd "$ROOT/web" && TRACTION_PAYLOAD="$(jq -c .summary "$tmp/expected.json")" bun -e '
       import { renderTraction } from "./src/traction.ts";
       const data = JSON.parse(process.env.TRACTION_PAYLOAD!); const html = renderTraction(data);
       for (const [name, value] of [["pitches", data.pitches], ["loans", data.loans], ["defaults", data.defaults]])
         if (!html.includes(`data-metric="${name}">${value}</dd>`)) throw new Error(`rendered ${name} mismatch`);
     ')
-    jq -c '.summary' <<<"$expected"
+    jq -c '.summary' "$tmp/expected.json"
     echo 'PASS: local game page serves all three values from finalized Long Con receipt events'
     ;;
   *) echo 'usage: scripts/edge-traction-check.sh --events | --evidence | --page-local <web/dist>' >&2; exit 2;;

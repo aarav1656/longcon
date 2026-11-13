@@ -90,10 +90,10 @@ goto_page() { "${B[@]}" use "$TAB" >/dev/null; "${B[@]}" goto "http://127.0.0.1:
 # guards on its own port and the call retries until it ran in our tab.
 ev() { # eval JS expression in our tab, raw value
   local out i
-  for i in 1 2 3 4 5 6 7 8; do
+  for i in $(seq 1 40); do
     "${B[@]}" use "$TAB" >/dev/null
     if out="$("${B[@]}" eval "(function(){if(location.port!=='$PORT')throw new Error('__wrongtab__');return ($1)})()" 2>&1)"; then jq -r '.value' <<<"$out"; return 0; fi
-    case "$out" in *__wrongtab__*) sleep 0.3;; *) printf '%s\n' "$out" >&2; return 1;; esac
+    case "$out" in *__wrongtab__*) sleep "0.$((RANDOM % 6 + 2))";; *) printf '%s\n' "$out" >&2; return 1;; esac
   done
   printf '%s\n' "$out" >&2; return 1
 }

@@ -1,5 +1,5 @@
 /** Upstream testnet RPC endpoints tried in order by the same-origin /api/rpc function. */
-export const RPC_POOL = ['https://rpc.testnet.near.org', 'https://near-testnet.drpc.org', 'https://archival-rpc.testnet.fastnear.com'];
+export const RPC_POOL = ['https://near-testnet.drpc.org', 'https://rpc.testnet.near.org', 'https://archival-rpc.testnet.fastnear.com'];
 
 /** True when an upstream answer means "ask another node": HTTP 429/5xx, or a JSON-RPC rate-limit error carried in a 200. */
 export function shouldFailOver(status: number, body: string): boolean {

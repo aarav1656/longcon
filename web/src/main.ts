@@ -1,6 +1,8 @@
 import './style.css';
 import { Chain, Config, explain, identity, loadConfig } from './chain.ts';
 import { loadTraction, renderTraction } from './traction.ts';
+import { createWorld } from './world.ts';
+import { sfx, startMusic, toggleMute, muted } from './sfx.ts';
 import { checkPitch, classLabel, classShort, clampSentence, esc, nextMove, newsArrives, shortId, STATUS_LABEL, txUrl, answeredLine, newsLines, sha256Hex, signatureValid } from './words.ts';
 
 interface Merchant { id: number; name: string; town: number; gold: number; grain: number; outstanding: number; buy_price: number; sell_price: number; lost_total: number; town_name: string; treasury_room: number; due_exposure: number[] }
@@ -65,6 +67,14 @@ const GREETING = [
 ];
 const TOWN_ART = (m?: Merchant) => Math.min(2, Math.max(0, m?.town ?? selected));
 let seenOutcome = -1;
+let talking = false;
+let askOver = false;
+let typedAt = 0;
+let lastDay = 0;
+let lineShown = '';
+let typer = 0;
+const VOICE = [520, 300, 420];
+let world: ReturnType<typeof createWorld>;
 let moodUntil = 0;
 let stampFor = -1;
 
@@ -78,6 +88,15 @@ function skeleton() {
         <div id="road"></div>
       </nav>
     </div>
+    <section class="world" id="world" aria-label="The road. Walk with the arrow keys or WASD, press E next to a merchant to talk, or click where to walk.">
+      <canvas id="worldcanvas"></canvas>
+      <p class="walkhint">Arrows or WASD to walk. E to talk. Or click where to go.</p>
+      <div class="pad" aria-hidden="true">
+        <button type="button" data-pad="up">&#9650;</button><button type="button" data-pad="left">&#9664;</button>
+        <button type="button" data-pad="right">&#9654;</button><button type="button" data-pad="down">&#9660;</button>
+        <button type="button" class="act" data-pad="act">E</button>
+      </div>
+    </section>
     <section class="stage" id="stage" aria-label="The market stall">
      <div class="scene">
       <img class="layer" id="scene-back" alt="" src="/art/town0-back.png">
@@ -88,6 +107,7 @@ function skeleton() {
       <div class="bubble" id="mline" aria-live="polite"></div>
       <div id="seal"></div>
       <div class="coins" id="coins"></div>
+      <button class="btn small back" type="button" data-act="leave">&#9664; Back to the road <kbd>Esc</kbd></button>
       <div class="quest wait" id="move" role="status" aria-live="polite"><span class="dot"></span><span id="movetext"></span></div>
      </div>
      <div class="dialog" aria-label="The table">
@@ -131,7 +151,7 @@ function mountForm() {
       <div class="field"><label for="bond">Bond you stake</label><div class="well"><span class="ico s lock"></span><input id="bond" type="number" min="0" value="6" inputmode="numeric"></div></div>
       <button class="btn gold big" id="send" data-act="pitch" type="button">Pitch</button>
     </div>
-    <p class="hint"><span id="pitchcount">0 of 400 bytes</span>. The bond burns if you do not repay.</p>
+    <p class="hint"><span id="pitchcount">0 of 400 bytes</span>. <span id="capline"></span></p>
     <p class="err" id="err" role="alert"></p>`;
   $<HTMLTextAreaElement>('#pitch').addEventListener('input', syncForm);
   $<HTMLInputElement>('#ask').addEventListener('input', syncForm);
@@ -150,6 +170,17 @@ function syncForm() {
   send.setAttribute('aria-busy', String(waiting || busy === 'offer'));
   send.textContent = waiting ? 'Waiting for the merchant' : busy === 'offer' ? 'Sending' : m ? `Pitch ${m.name}` : 'Pitch';
   $('#err').textContent = errMsg;
+  const ask = Number($<HTMLInputElement>('#ask').value) || 0;
+  const bond = Number($<HTMLInputElement>('#bond').value) || 0;
+  if (m && st) {
+    // The road never lets more through than these limits; it can cut further (daily loss cap), never less strictly.
+    const credit = bond + (pv?.earned_line ?? 0) - (pv?.outstanding ?? 0);
+    const cap = Math.max(0, Math.min(st.rules.max_ask, m.treasury_room, m.gold, credit));
+    const was = askOver;
+    askOver = ask > cap;
+    $('#capline').textContent = askOver ? `${m.name} frowns: the road lets at most ${cap} gold through to you here.` : `The road lets at most ${cap} gold through to you here.`;
+    if (was !== askOver) renderStage();
+  }
 }
 
 let capturing = false;
@@ -207,6 +238,7 @@ function renderBar() {
   put("#bar", `
     <div class="logo"><div><b>LONG CON</b><small>talk three AI merchants out of their gold</small></div></div>
     <div class="panel chip day"><span class="ico ${d.left > 0 ? 'sun' : 'moon'}"></span><div><div class="k">Road day</div><div class="v">${st?.day ?? '-'}</div><span class="daybar" title="${d.left > 0 ? `${d.left}s of daylight left` : 'The day can end'}"><i style="width:${d.pct}%"></i></span></div></div>
+    <button class="panel chip mute" type="button" data-act="mute" aria-pressed="${muted}" aria-label="${muted ? 'Sound off' : 'Sound on'}"><span class="note ${muted ? 'off' : ''}">&#9835;</span></button>
     <div class="panel chip" id="purse"><span class="ico coin"></span><div><div class="k">Your gold</div><div class="v">${p ? p.gold : '-'}</div></div></div>
     <div class="panel chip"><span class="ico lock"></span><div><div class="k">Bond locked</div><div class="v">${p ? p.locked_bonds : '-'}</div></div></div>
     <div class="panel chip"><span class="ico star"></span><div><div class="k">Credit earned</div><div class="v">${p ? p.earned_line : '-'}</div></div></div>
@@ -251,15 +283,19 @@ function renderStage() {
   if (o?.outcome && o.id !== seenOutcome) {
     if (seenOutcome !== -1) {
       moodUntil = now + 2400;
-      if (o.status === 'committed') coinBurst(o.outcome.advance);
+      if (o.status === 'committed') { coinBurst(o.outcome.advance); sfx.seal(); setTimeout(() => sfx.coins(o.outcome!.advance), 350); }
+      else if (o.status === 'refused') sfx.refused();
+      else sfx.seal();
       $('#stage').classList.remove('shake'); void $('#stage').offsetWidth; $('#stage').classList.add('shake');
     }
     seenOutcome = o.id;
   }
   const mood = pv?.pending_offer ? 'think'
     : mine && now < moodUntil ? 'talk'
-      : mine && o!.status === 'committed' ? 'pleased'
-        : mine && o!.status === 'refused' ? 'stern' : 'idle';
+      : askOver ? 'stern'
+        : now - typedAt < 1500 ? 'think'
+          : mine && o!.status === 'committed' ? 'pleased'
+            : mine && o!.status === 'refused' ? 'stern' : 'idle';
   for (const sel of ['#merchant', '#portrait']) {
     const el = $(sel);
     el.dataset.m = String(art);
@@ -285,7 +321,20 @@ function renderStage() {
   const line = pv?.pending_offer ? `<q>Hmm. Let me think on that.</q>`
     : mine && o!.outcome ? `<q>${esc(o!.outcome!.reason || 'I have nothing more to say.')}</q>`
       : `<q>${esc(GREETING[art])}</q>`;
-  put('#mline', line);
+  if (line !== lineShown) {
+    lineShown = line;
+    const el = $('#mline');
+    const full = line.replace(/<[^>]+>/g, '');
+    window.clearInterval(typer);
+    let i = 0;
+    el.innerHTML = '';
+    typer = window.setInterval(() => {
+      i = Math.min(full.length, i + 2);
+      el.textContent = full.slice(0, i);
+      if (talking && i % 4 === 0) sfx.blip(VOICE[art]);
+      if (i >= full.length) { window.clearInterval(typer); el.innerHTML = line; }
+    }, 30);
+  }
 }
 
 function coinBurst(n: number) {
@@ -405,7 +454,28 @@ function renderFoot() {
   put("#foot", `Contract <a href="${esc(cfg.explorer)}/address/${esc(cfg.contract_id)}" target="_blank" rel="noreferrer">${esc(cfg.contract_id)}</a> on ${esc(cfg.network)}. Model ${esc(st?.model ?? '')}. Every gold figure on this page is read from the contract.`);
 }
 
+function pushWorld() {
+  if (!world || !st) return;
+  const d = dayLeft();
+  if (lastDay && st.day > lastDay) sfx.bell();
+  lastDay = st.day;
+  const recent = records.filter((r) => st!.day - r.day < 3).map((r) => ({ day: r.day, town: r.town, cls: classShort(r.class) }));
+  world.setState({
+    merchants: st.merchants.map((mm, i) => ({ name: mm.name, town_name: mm.town_name, gold: mm.gold, news: (news[i] ?? []).map((r) => ({ day: r.day, town: r.town, cls: classShort(r.class) })) })),
+    couriers: recent, day: st.day, dayFrac: d.pct / 100, canEnd: d.left === 0, selected,
+  });
+}
+
+function setTalking(on: boolean) {
+  talking = on;
+  document.querySelector('.game')!.classList.toggle('talking', on);
+  world?.setActive(!on);
+  if (on) { lineShown = ''; renderAll(); $('#stage').scrollIntoView({ block: 'nearest' }); }
+  else { world?.standAt(selected); sfx.talkClose(); $('#world').scrollIntoView({ block: 'nearest' }); }
+}
+
 function renderAll() {
+  pushWorld();
   renderBar(); renderRoad(); renderStage(); renderMove(); renderVerdict(); renderMine(); renderLedger(); renderFoot(); syncForm();
 }
 
@@ -523,9 +593,13 @@ app.addEventListener('click', (ev) => {
   if (!t) return;
   const a = t.dataset.act!;
   if (a === 'traction-refresh') { void refreshTraction(); return; }
+  if (a === 'leave') { setTalking(false); return; }
+  if (a === 'mute') { toggleMute(); renderBar(); return; }
   if (a === 'pick') {
     selected = Number(t.dataset.m);
-    renderAll();
+    world?.standAt(selected);
+    if (!talking) sfx.talkOpen();
+    setTalking(true);
     return;
   }
   if (a === 'starter') {
@@ -554,6 +628,7 @@ app.addEventListener('click', (ev) => {
   }
   if (a === 'repay') { void act('repay_debt', { debt_id: Number(t.dataset.d) }, 'repay'); return; }
   if (a === 'endday') { void act('advance_day', {}, 'day'); }
+  if (a === 'pitch') sfx.blip(660);
 });
 
 setInterval(() => {
@@ -569,6 +644,20 @@ async function boot() {
   } catch { attestation = null; }
   chain = new Chain(cfg, identity());
   skeleton();
+  world = createWorld($<HTMLCanvasElement>('#worldcanvas'), (mi) => { selected = mi; setTalking(true); });
+  world.standAt(0);
+  const wake = () => { if (!muted) startMusic(); };
+  window.addEventListener('pointerdown', wake, { once: true });
+  window.addEventListener('keydown', wake, { once: true });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && talking) setTalking(false); });
+  $('#pitch').addEventListener('input', () => { typedAt = Date.now(); renderStage(); });
+  document.querySelectorAll<HTMLButtonElement>('.pad button').forEach((b) => {
+    const d = b.dataset.pad!;
+    if (d === 'act') { b.addEventListener('click', () => world.act()); return; }
+    const go = (e: Event) => { e.preventDefault(); world.move(d as any); };
+    const stop = () => world.move(null);
+    b.addEventListener('pointerdown', go); b.addEventListener('pointerup', stop); b.addEventListener('pointerleave', stop); b.addEventListener('pointercancel', stop);
+  });
   void refreshTraction();
   setInterval(() => { void refreshTraction(); }, 60_000);
   renderBar();

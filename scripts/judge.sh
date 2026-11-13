@@ -34,6 +34,8 @@ run_tests() {
 ' ;;
     *bun*not\ found*|*bun*No\ such\ file*) printf 'Install: https://bun.sh/docs/installation
 ' ;;
+    *node*not\ found*|*node*No\ such\ file*) printf 'Install: https://nodejs.org/en/download
+' ;;
   esac
   return 1
 }

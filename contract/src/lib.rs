@@ -2,6 +2,7 @@
 //! a yield; a worker fetches the merchant model's answer and its signature; the contract verifies
 //! the signature over the exact request it built, then clamps the terms against hard caps.
 mod attest;
+pub mod fork;
 mod prompt;
 mod rumour;
 pub mod rules;

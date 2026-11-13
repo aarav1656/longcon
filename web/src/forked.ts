@@ -158,9 +158,9 @@ function renderVerdict() {
       : c.status === 'draw' ? `You backed the cap of ${fork.backed_rule}. Both towns end level, so the claim draws.`
       : 'The contract is settling your claim.';
     const w = richer(fork);
-    const side = (br: Branch, lead: boolean) => `<div class="fd ${lead ? 'up' : w === null ? '' : 'down'}"><span class="fk">Cap ${br.rule}</span><b class="num">${br.final_gold}</b><span class="fk">${br.defaults ? `${br.defaults} default${br.defaults > 1 ? 's' : ''}` : 'no default'}</span></div>`;
+    const side = (br: Branch, lead: boolean) => `<div class="fd ${lead ? 'up' : w === null ? '' : 'down'}"><span class="fk">Cap ${br.rule}</span><b class="num">${br.final_gold}</b><span class="fk">${br.defaults ? `${br.defaults} unpaid loan${br.defaults > 1 ? 's' : ''}` : 'no unpaid loan'}</span></div>`;
     const gap = w === null ? 0 : fork.branches[w].final_gold - fork.branches[1 - w].final_gold;
-    body += `<div class="fdelta" aria-label="Final gold in each town">${side(fork.branches[0], w === 0)}<div class="fgap"><b class="num">${w === null ? '=' : `+${gap}`}</b><span class="fk">${w === null ? 'level' : `gold for Marta under cap ${fork.branches[w].rule}`}</span></div>${side(fork.branches[1], w === 1)}</div>`;
+    body += `<div class="fdelta" aria-label="Final gold in each town">${side(fork.branches[0], w === 0)}<div class="fgap"><b class="num">${w === null ? '=' : `+${gap}`}</b><span class="fk">${w === null ? 'level' : `more gold for Marta under cap\u00a0${fork.branches[w].rule}`}</span></div>${side(fork.branches[1], w === 1)}</div>`;
     const said = fork.branches[0].loans.map((l) => `<li><b>${esc(l.name.split(' ')[0])}</b> ${l.accepted ? `lend ${l.proposed_advance}` : 'refuse'}<q>${esc(l.reason)}</q></li>`).join('');
     body += `<div class="fsigned"><p class="fk">One signed answer, applied to both towns <span class="mono">${esc(fork.signer || '')}, NEAR AI attested, response ${esc(shortId(fork.response_hash, 8, 6))}</span></p><ul>${said}</ul></div>`;
     body += `<h2>${esc(verdictLine(fork))}</h2><p class="claim ${c.status}">${esc(line)}${settled ? ` ${tx(settled.tx, 'settlement')}` : ''}</p>

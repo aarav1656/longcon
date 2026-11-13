@@ -23,6 +23,8 @@ let replayAt = 0;
 let settled: { tx: string; seconds: number } | null = null;
 let settling = false;
 let sealedAt = 0;
+let lateShown = false;
+const LATE_MS = 35000;
 let merchantName = "the merchant";
 let openPurse: number | null = null;
 let doneAt = 0;
@@ -78,6 +80,8 @@ function renderControls() {
   const label = (r: Rule) => (fork && backed === r ? `Daily loss cap ${r} <small>backed</small>` : `Daily loss cap ${r}`);
   const status = busy || (onboardFailed ? 'The account is closed. Press Retry to open it.' : !ready ? (onboardTry > 1 ? `Opening your account on testnet, attempt ${onboardTry} of 6.` : 'Opening your account on testnet.') : !fork ? 'Choose the cap you back.' : fork.status === 'open' ? `You back the cap of ${backed}. Fast-forward when you are ready.` : '');
   const sealing = fork?.status === 'sealed';
+  const late = sealing && Date.now() - sealedAt > LATE_MS;
+  lateShown = late;
   put('#controls', `
     <div class="pick">
       <span class="fk">Back a rule</span>
@@ -86,6 +90,7 @@ function renderControls() {
     <div class="go" ${fork && fork.status !== 'open' && !sealing ? 'hidden' : ''}>
       <button class="btn green big" type="button" data-act="seal" ${fork?.status === 'open' && !busy ? '' : 'disabled'} ${sealing ? 'aria-busy="true"' : ''}>${sealing ? 'The merchant is deciding' : fork && fork.status !== 'open' ? 'Seven days passed' : 'Fast-forward seven days'}</button>
     </div>
+    ${late ? '<p class="retry">The merchant is taking longer than usual. The seal is on chain, and the answer settles it the moment it lands. <button class="btn gold" type="button" data-act="recheck">Check again</button></p>' : ''}
     ${onboardFailed ? '<p class="retry"><button class="btn gold" type="button" data-act="retry">Retry</button></p>' : ''}
     <p class="status" role="status">${esc(status)}${sealing ? ` <span class="num">${Math.max(0, Math.round((Date.now() - sealedAt) / 1000))} s</span>` : ''}</p>`);
 }
@@ -169,21 +174,23 @@ function renderVerdict() {
 
 function renderProof() {
   if (!fork || fork.status === 'open') { put('#proof', '<h2><span class="ico s lock"></span>Proof</h2><p class="claim">Seal the fork and the world hash, both start hashes, the signed request and response and the divergence receipt land here.</p>'); return; }
-  const rows: [string, string][] = [
+  const rows = ([
     ['Fork', `#${fork.id} on ${cfg.contract_id}`],
     ['World hash', fork.world_hash],
     ['Cap 15 start hash', fork.branches[0].start_hash],
     ['Cap 25 start hash', fork.branches[1].start_hash],
     ['Request hash', fork.request_hash],
-    ['Response hash', fork.response_hash],
-    ['Signer', fork.signer ? `${fork.signer}, NEAR AI attested` : '–'],
-    ['Divergence receipt', fork.divergence?.receipt ?? '–'],
-    ['Day 7 hash, cap 15 | cap 25', fork.divergence ? `${shortId(fork.divergence.hash_a, 10, 8)} | ${shortId(fork.divergence.hash_b, 10, 8)}` : '–'],
-    ['Blocks', `split ${fork.split_block}, sealed ${fork.sealed_block}, resolved ${fork.resolved_block || '–'}${fork.claim.settled_block ? `, settled ${fork.claim.settled_block}` : ''}`],
-  ];
+    ['Response hash', fork.response_hash || ''],
+    ['Signer', fork.signer ? `${fork.signer}, NEAR AI attested` : ''],
+    ['Divergence receipt', fork.divergence?.receipt ?? ''],
+    ['Day 7 hash, cap 15 | cap 25', fork.divergence ? `${shortId(fork.divergence.hash_a, 10, 8)} | ${shortId(fork.divergence.hash_b, 10, 8)}` : ''],
+    ['Blocks', `split ${fork.split_block}, sealed ${fork.sealed_block}${fork.resolved_block ? `, resolved ${fork.resolved_block}` : ''}${fork.claim.settled_block ? `, settled ${fork.claim.settled_block}` : ''}`],
+  ] as [string, string][]).filter(([, v]) => v);
+  const waiting = fork.status === 'sealed' ? '<p class="claim">Waiting for the merchant to sign its answer. The signer, response hash and divergence receipt land here the moment it arrives.</p>' : '';
   const links = txs.map((t) => tx(t.hash, t.label)).join('');
   put('#proof', `
     <h2><span class="ico s lock"></span>Proof</h2>
+    ${waiting}
     <dl>${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd class="mono" title="${esc(v)}">${v.length > 40 && !v.includes(' ') ? esc(shortId(v, 14, 10)) : esc(v)}</dd></div>`).join('')}</dl>
     <p class="links">${links}</p>
     <p class="read mono">near contract call-function as-read-only ${esc(cfg.contract_id)} fork json-args '{"fork_id":${fork.id}}' network-config testnet now</p>
@@ -295,6 +302,12 @@ async function seal() {
   void follow();
 }
 
+async function recheck() {
+  if (!fork || fork.status !== 'sealed') return;
+  try { fork = (await readFork(chain, fork.id)) ?? fork; } catch { /* the follow loop keeps reading */ }
+  renderControls();
+}
+
 async function follow() {
   while (fork && fork.status === 'sealed') {
     await nap(1200);
@@ -362,6 +375,7 @@ async function boot() {
     else if (t.dataset.act === 'edit') void tryEdit();
     else if (t.dataset.act === 'again') again();
     else if (t.dataset.act === 'retry') void onboard();
+    else if (t.dataset.act === 'recheck') void recheck();
   });
   const st = await chain.view<{ merchants: { name: string; gold: number }[] }>("state").catch(() => null);
   if (st?.merchants?.[0]) { merchantName = st.merchants[0].name; openPurse = Math.min(200, st.merchants[0].gold); render(); }
@@ -371,7 +385,11 @@ async function boot() {
       if (replayDone() && !doneAt && (fork.status === 'settled' || !fork.divergence)) doneAt = elapsed();
       renderTwins(); renderVerdict();
     }
-    if (fork?.status === 'sealed') renderControls();
+    if (fork?.status === 'sealed') {
+      const n = document.querySelector('#controls .status .num');
+      if (n) n.textContent = `${Math.max(0, Math.round((Date.now() - sealedAt) / 1000))} s`;
+      if (!lateShown && Date.now() - sealedAt > LATE_MS) renderControls();
+    }
   }, 250);
 }
 

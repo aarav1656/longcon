@@ -5,25 +5,27 @@ A browser game on a NEAR testnet contract. Three AI merchants on a road of three
 
 Built at NEAR HACKATHON. Tracks: games, security.
 
+Games track, in one minute: no wallet and no popups (a relayer pays gas for your session account), merchants that read each pitch and set the terms with a reasoning tooltip on every borrower, every cap in one readable file ([`contract/src/rules.rs`](contract/src/rules.rs)), NEP-245 rumour tokens minted when a con lands, and a seven-day fast-forward that resolves in about a minute on the live page.
+
 ## The problem
 
 Games that let you talk an AI into lending keep their rules on a private server. A player cannot tell whether the model refused or the house did. Long Con moves the lending rules into a contract: the model proposes, the contract decides, and a landed con becomes structured news that can enter the next town's prompt.
 
-## Out-argue three rival grifters for one purse (live, no wallet, no install)
+## Fork the town: pick one rule, watch two economies (live, no wallet, no install)
 
-Open https://near-longcon.pages.dev/ in any browser. Every step below runs against the live testnet contract `longcon4-game.testnet`.
+Open https://near-longcon.pages.dev/game in any browser. Every step below runs against the live testnet contract `longcon4-game.testnet`.
 
-1. **Do:** open the link. **See:** a pixel market road, the line "Out-argue three rival grifters for one purse.", a news ticker written from the newest con on the ledger, and above the stall a queue strip: a seal clock, three funded rival grifters (Doran Vale, Wick the Pale, Sable Orrin) with their pitches already in, and your card.
-2. **Do:** type over your card or keep the starter, "Two gold until tomorrow for a sack of seed. I pay back three.", and press `Pitch <merchant> gold` (it holds focus, so Enter works). **See:** your card joins the queue as fourth and the clock runs down from about 23 seconds.
-3. **See, when the clock reaches zero:** the contract seals every pitch into one request it wrote itself, the merchant reads all four at once, and the panel turns into a ranked list: who was paid, in the order the model listed them, the drain bar of the merchant's daily loss cap, and the slot where the cap cut the purse off. About 45 seconds after the page loaded for a first visit.
-4. **Do:** open `How answer checked`. **See:** the request and response hashes with copy buttons, the registered signer key matching the published attestation report, the TCB status, and your pitch transaction on nearblocks.
-5. **Do:** press `Next round`. **See:** three new rival pitches written from what the road has heard; the rivals avoid the class of con the news already burned.
-6. **Do:** press `End day` under the road strip until the debt falls due. **See:** the debt defaults and the ticker leads with `Your con landed in <town>. <next town> hears it on day N.` The next town's merchant refuses that structure and its answer names the news.
-7. **Verify on chain:** `near contract call-function as-read-only longcon4-game.testnet offer_by_id json-args '{"offer_id":<id from the ranked list>}' network-config testnet now` returns the offer with the merchant's verdict, the clamps and the request and response hashes, and `... con_records json-args '{"from":0,"limit":5}' ...` returns the landed cons with class, town, day, principal and the request and response hashes.
+1. **Do:** open the link. **See:** a pixel market road, the line "Pick a rule. The contract splits the town in two and one signed answer runs through both.", the queue at Marta's stall (`Wick 20`, `Sable 14`, `Ines 12`, `Tam 10`) and two buttons, `Daily loss cap 15` and `Daily loss cap 25`. The status reads `NEAR testnet, account ready` once your account exists on testnet.
+2. **Do:** press one cap. **See:** the town splits into two panes that differ only in the daily loss cap; your pick is tagged `BACKED`. The `fork_town` transaction link appears in the proof panel.
+3. **Do:** press `Fast-forward`. **See:** the contract sends the whole queue to one NEAR AI request and one signed answer comes back. The seven days replay in the two towns at 700 ms per day: a gold line per town, the day-by-day loan feed, and a `DEFAULT` stamp on the town where a borrower never repays.
+4. **See:** a banner above the scenes names which cap keeps more gold. Your backed cap is settled by the contract against the receipt it recorded; the `fork_settle` transaction link and the seconds from page load to the settled claim appear under the banner.
+5. **Do:** read the proof panel. **See:** the world hash, both start hashes (equal), the request and response hashes, the signer `Qwen/Qwen3.8-27B` that matches the NEAR AI attestation report, the receipt, the blocks and the read command.
+6. **Do:** press `Try to change the rule now`. **See:** the contract refuses the edit with its own sentence (the rule is frozen) and the refused transaction link.
+7. **Verify on chain:** `near contract call-function as-read-only longcon4-game.testnet fork json-args '{"fork_id":4}' network-config testnet now` returns a settled fork with both branches and the claim; the proof panel shows the same command with your own fork id.
 
-What the closest entries on the board do not show in their first minute: Bouncer is one visitor against one guard; Freysa, on Base, is one visitor against one model for a fixed pot; Nims and the other merchant-agent entries quote prices to one buyer at a time. In Long Con four arguments sit side by side in one request the contract authored and an attested enclave signed, the scarce thing is the merchant's gold under a daily loss cap, and the ranking is the model's trust, signed, so the order cannot be rigged after the fact. Every landed con then travels one town per day into the next merchant's prompt.
+What the closest entries on the board do not show in their first minute: Bouncer is one visitor against one guard; Freysa, on Base, is one visitor against one model for a fixed pot; Nims and the other merchant-agent entries quote prices to one buyer at a time. In Forked Town the visitor changes one rule and watches two parallel economies run from the same signed answer, with the receipt of where they first diverged and a claim the contract settles against it. The earlier queue game (four sealed pitches against one merchant, the purse drained down the model's ranked list) stays live at https://near-longcon.pages.dev/queue.
 
-Source for the page: `web/src/queue.ts` (the queue strip and ranked list), `web/src/main.ts`, `web/src/words.ts` (`signatureValid`, `travelStops`). The rival grifters: `worker/src/rivals.ts`.
+Source for the page: `web/src/forked.ts` and `web/src/forked.css` (the two towns, replay and proof panel), `web/src/fork.ts` (the cast and reading a fork), `contract/src/fork.rs` (`fork_town`, `fork_rule`, `fork_seal`, `fork_settle`).
 
 ## Read the ledger without playing
 

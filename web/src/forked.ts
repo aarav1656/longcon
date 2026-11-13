@@ -12,6 +12,8 @@ const app = document.getElementById('app')!;
 let cfg: Config;
 let chain: Chain;
 let ready = false;
+let onboardFailed = false;
+let onboardTry = 0;
 let fork: Fork | null = null;
 let backed: Rule | null = null;
 let busy = '';
@@ -74,7 +76,7 @@ function renderQueue() {
 function renderControls() {
   const open = !fork || fork.status === 'open';
   const label = (r: Rule) => (fork && backed === r ? `Daily loss cap ${r} <small>backed</small>` : `Daily loss cap ${r}`);
-  const status = busy || (!ready ? 'Opening your account on testnet.' : !fork ? 'Choose the cap you back.' : fork.status === 'open' ? `You back the cap of ${backed}. Fast-forward when you are ready.` : '');
+  const status = busy || (onboardFailed ? 'The account is closed. Press Retry to open it.' : !ready ? (onboardTry > 1 ? `Opening your account on testnet, attempt ${onboardTry} of 6.` : 'Opening your account on testnet.') : !fork ? 'Choose the cap you back.' : fork.status === 'open' ? `You back the cap of ${backed}. Fast-forward when you are ready.` : '');
   const sealing = fork?.status === 'sealed';
   put('#controls', `
     <div class="pick">
@@ -84,6 +86,7 @@ function renderControls() {
     <div class="go">
       <button class="btn green big" type="button" data-act="seal" ${fork?.status === 'open' && !busy ? '' : 'disabled'} ${sealing ? 'aria-busy="true"' : ''}>${sealing ? 'The merchant is deciding' : fork && fork.status !== 'open' ? 'Seven days passed' : 'Fast-forward seven days'}</button>
     </div>
+    ${onboardFailed ? '<p class="retry"><button class="btn gold" type="button" data-act="retry">Retry</button></p>' : ''}
     <p class="status" role="status">${esc(status)}${sealing ? ` <span class="num">${Math.max(0, Math.round((Date.now() - sealedAt) / 1000))} s</span>` : ''}</p>`);
 }
 
@@ -186,7 +189,7 @@ function renderProof() {
 }
 
 function renderNet() {
-  put('#net', `<span class="fdot ${ready ? 'on' : ''}"></span>${ready ? 'NEAR testnet, account ready' : 'NEAR testnet, opening account'}`);
+  put('#net', `<span class="fdot ${ready ? 'on' : ''}"></span>${ready ? 'NEAR testnet, account ready' : onboardFailed ? 'NEAR testnet, account closed' : 'NEAR testnet, opening account'}`);
 }
 
 function render() {
@@ -194,15 +197,26 @@ function render() {
 }
 
 async function onboard() {
-  try {
-    await chain.activate(60_000);
-    if (!(await chain.view('player', { account_id: chain.me.id }))) {
-      await chain.send('join', {});
-      for (let k = 0; k < 60 && !(await chain.view('player', { account_id: chain.me.id })); k++) await nap(800);
+  onboardFailed = false; notice = null;
+  const ATTEMPTS = 6;
+  let last = '';
+  for (let k = 1; k <= ATTEMPTS && !ready; k++) {
+    onboardTry = k; renderControls(); renderNet();
+    try {
+      await chain.activate(60_000);
+      if (!(await chain.view('player', { account_id: chain.me.id }))) {
+        await chain.send('join', {});
+        for (let j = 0; j < 60 && !(await chain.view('player', { account_id: chain.me.id })); j++) await nap(800);
+      }
+      ready = true;
+    } catch (e) {
+      last = (e as Error).message;
+      if (k < ATTEMPTS) await nap(Math.min(1500 * k, 6000));
     }
-    ready = true;
-  } catch (e) {
-    notice = { kind: 'bad', text: `The account is not ready: ${(e as Error).message}` };
+  }
+  if (!ready) {
+    onboardFailed = true;
+    notice = { kind: 'bad', text: `The account did not open (${last}). Retry opens it again.` };
   }
   render();
 }
@@ -231,7 +245,8 @@ async function pick(rule: Rule) {
     } else if (!fork) {
       backed = rule;
       busy = 'split: the contract is cloning the town.'; render();
-      while (!ready) await nap(300);
+      while (!ready && !onboardFailed) await nap(300);
+      if (!ready) throw new Error('the account is not open yet, press Retry');
       let before = await myForkIds();
       if (before.length >= 3) {
         localStorage.removeItem(KEY_SLOT);
@@ -343,6 +358,7 @@ async function boot() {
     else if (t.dataset.act === 'seal') void seal();
     else if (t.dataset.act === 'edit') void tryEdit();
     else if (t.dataset.act === 'again') again();
+    else if (t.dataset.act === 'retry') void onboard();
   });
   const st = await chain.view<{ merchants: { name: string; gold: number }[] }>("state").catch(() => null);
   if (st?.merchants?.[0]) { merchantName = st.merchants[0].name; openPurse = Math.min(200, st.merchants[0].gold); render(); }

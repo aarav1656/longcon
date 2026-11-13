@@ -150,3 +150,6 @@
   .controls .btn.big { font-size: 14px; padding-inline: 6px; white-space: normal; line-height: 1.1; min-width: 0; }
   .controls .btn.big small, .controls .btn .tagb { display: block; }
 }
+
+.retry{margin:.5rem 0 0}
+.retry .btn{min-width:8rem}

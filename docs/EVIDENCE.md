@@ -724,3 +724,13 @@ Counts at finalized height `277274723`: pitches `53`, loans `36`, defaults `36`.
 | Must-fail, replay | a second `fork_settle` is refused with "this claim is already settled", tx `6G6fqzqYnYrdQJu3331e6FYvuX8eAVfzW8ggqjNw5mur` |
 | Relayer reports the contract's refusal | `web/scripts/relay-fail-check.ts` sends a call the contract refuses; the relayer answers 422 with the contract's sentence |
 | Merchant runs on NEAR AI Cloud | the relayer and worker answer through `https://cloud-api.near.ai/v1` with `Qwen/Qwen3.8-27B`; `scripts/signer-check.sh` passes (contract signer `89154a43a47684742c3d1753252bb6f49f61da9d8c84fc9b1def2df130cb2d93` equals a fresh attestation's signing_address, TDX quotes verified); fork `19` resolved at block `277557147` with signer `Qwen/Qwen3.8-27B`, kind `provider_tee`, resume tx `ECoeUVsHsrckg9piytfNkCrULbXhhmAVecePE5E61kQY`, claim settled by tx `31AP9cFm6nLJcxKRiyMDkwPRKZuxo9DaQkK3a1u31J9W` in 40.1 s from a cold account |
+
+## Forked Town: the cast books under the NEAR AI merchant
+
+| What | Value |
+|---|---|
+| Run | `bun web/scripts/fork-as.ts 25`, 46.6 s from first call to settled claim; fork `24`, signer `Qwen/Qwen3.8-27B` |
+| Result | resolved at block `277562167`; cap 15 lends Sable 15 and ends at 185 gold, cap 25 lends Sable 20 and ends at 180 gold; first divergence day 0 |
+| Tx | split `HpY2suio7wH4i6DQvjcBgABTUCP6RPLJfPf3taq2smJY`, seal `5CpyZ7zjHnwyLKHMuS745k5nZp3eszSbURA8BJDnAdPW`, settle `7wZHoUUN1jYbbpt6biFDeGeeY64BWTdnt73iJQG8HJ1D` |
+| Must-fail | rule edit after seal `GZN3PNp5t1fALgbLd6mibd5WpeYaWg5WQw7YWsMZL4Rn`, forged receipt `HqJAaP1WjmAnZUGe1FrjsGd1AEo4YfypdS2kDQA4GTLR`, replay `CEcV9iEBw3YD9DxDeVcGBQ9CqD61zL5vnJLhhJMt7knd` |
+| Cast rate | the exact sealed request replayed 12 times with fresh seal nonces: the previous cast booked nobody in 4 of 12, the current cast books Sable in 12 of 12 |

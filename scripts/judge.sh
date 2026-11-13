@@ -80,7 +80,7 @@ else
 ' "$account"
   fi
   keys_body=$(printf '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"%s"}}' "$account")
-  if keys_json=$(rpc_post "$keys_body") && jq -e '.result.keys | type == "array"' >/dev/null 2>&1 <<<"$keys_json"; then
+  if [ -n "${account_json:-}" ] && jq -e '.result.code_hash | type == "string" and length > 20 and . != "11111111111111111111111111111111"' >/dev/null 2>&1 <<<"$account_json" && keys_json=$(rpc_post "$keys_body") && jq -e '.result.keys | type == "array"' >/dev/null 2>&1 <<<"$keys_json"; then
     key_count=$(jq -r '.result.keys | length' <<<"$keys_json")
     printf 'PASS live contract access-key list: %s keys at block %s
 ' "$key_count" "$(jq -r '.result.block_height' <<<"$keys_json")"

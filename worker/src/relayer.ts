@@ -2,6 +2,8 @@ import { account, env, provider, view } from './chain.ts';
 import { budgets, callFor, clientKey, proxiedClient, toAction, vet } from './delegate.ts';
 import { sleep } from './lib.ts';
 import { parseNearAmount } from 'near-api-js';
+import { existsSync } from 'node:fs';
+import { loadRivals, makeConductor, PERSONAS } from './rivals.ts';
 
 const contractId = env('CONTRACT_ID');
 const p = provider();
@@ -14,6 +16,12 @@ const PER_MINUTE = Number(process.env.RELAYER_PER_MINUTE ?? 30);
 const JOIN_DEPOSIT = BigInt(process.env.JOIN_DEPOSIT_YOCTO ?? '200000000000000000000000'); // 0.2 NEAR, the storage stake the contract requires on join
 const activationBudget = budgets(Number(process.env.ACTIVATE_PER_CLIENT_HOUR ?? 3), Number(process.env.ACTIVATE_GLOBAL_HOUR ?? 120), 3_600_000);
 const joinBudget = budgets(Number(process.env.JOIN_PER_CLIENT_DAY ?? 3), Number(process.env.RELAYER_JOINS_PER_DAY ?? 100), 86_400_000);
+
+const roundBudget = budgets(Number(process.env.ROUND_PER_CLIENT_HOUR ?? 12), Number(process.env.ROUND_GLOBAL_HOUR ?? 240), 3_600_000);
+const rivalsFile = process.env.RIVALS_FILE ?? `${process.env.HOME}/.config/longcon/rivals.json`;
+const rivals = existsSync(rivalsFile) ? loadRivals(rivalsFile, p) : new Map();
+const openRound = makeConductor(contractId, p, rivals, (id) => PERSONAS.find((x) => id.startsWith(`${x.slug}`))?.slug ?? '');
+const opening = new Set<number>();
 
 const hits = new Map<string, number[]>();
 function limited(who: string): boolean {
@@ -82,6 +90,21 @@ Bun.serve({
         const res: any = await relayer.transfer({ receiverId: account_id, amount: ACTIVATION });
         const tx = res?.transaction?.hash ?? res?.transactionOutcome?.id ?? res?.transaction_outcome?.id;
         return json({ ok: true, created: true, tx });
+      }
+      if (url.pathname === '/round' && req.method === 'POST') {
+        const { account_id, merchant } = (await req.json()) as { account_id: string; merchant: number };
+        if (!/^[0-9a-f]{64}$/.test(account_id) || ![0, 1, 2].includes(merchant)) return json({ error: 'round takes your 64 hex account and a stall 0 to 2' }, 400);
+        if (rivals.size === 0) return json({ error: 'the rival grifters are not at the road yet' }, 503);
+        if (!(await view(p, contractId, 'player', { account_id }))) return json({ error: 'join the road before you open a round' }, 400);
+        if (opening.has(merchant)) return json({ ok: true, merchant, opened: false, offers: [], reason: 'a round is opening at this stall' });
+        if (!roundBudget.take(who)) return json({ error: 'round limit reached for now' }, 429);
+        opening.add(merchant);
+        try {
+          const state: any = await view(p, contractId, 'state');
+          return json({ ok: true, ...(await openRound(merchant, state.merchants[merchant].town_name)) });
+        } finally {
+          opening.delete(merchant);
+        }
       }
       if (url.pathname === '/relay' && req.method === 'POST') {
         const { signed_delegate } = (await req.json()) as { signed_delegate: string };

@@ -153,11 +153,13 @@ test('answerPhase orders relay trouble, waiting, sending, queued, then the last 
 
 import { upstreamFor } from '../src/relayproxy.ts';
 
-test('relay proxy forwards only the three relayer routes with their methods', () => {
+test('relay proxy forwards only the four relayer routes with their methods', () => {
   const up = 'https://relay.example/longcon-relay/';
   expect(upstreamFor(['activate'], up, 'POST')).toBe('https://relay.example/longcon-relay/activate');
   expect(upstreamFor('relay', up, 'POST')).toBe('https://relay.example/longcon-relay/relay');
   expect(upstreamFor(['health'], up, 'GET')).toBe('https://relay.example/longcon-relay/health');
+  expect(upstreamFor(['round'], up, 'POST')).toBe('https://relay.example/longcon-relay/round');
+  expect(upstreamFor(['round'], up, 'GET')).toBeNull();
   expect(upstreamFor(['activate'], up, 'GET')).toBeNull();
   expect(upstreamFor(['..', 'admin'], up, 'POST')).toBeNull();
   expect(upstreamFor(undefined, up, 'GET')).toBeNull();

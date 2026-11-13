@@ -702,3 +702,11 @@ Counts at finalized height `277274723`: pitches `53`, loans `36`, defaults `36`.
 | Order is the model's | the visitor's slot was last in arrival order and first in the signed list; the debts were booked in list order (`batch::the_purse_is_paid_down_the_order_the_model_lists_not_the_order_of_arrival`, mutation M56 KILLED) |
 | Must-fail | a reordered answer pays nobody (`batch::an_answer_reordered_after_signing_is_rejected_and_pays_nobody`), batch N's answer cannot resolve batch N+1, a pitch after the seal cannot enter the sealed batch |
 | Rival grifters | accounts `doran1`, `wick1`, `sable1` (and `2`) under `longcon-worker.testnet`, each funded and joined on testnet; the relayer route `POST /round` opens a round with all three |
+
+## Concurrent travelers share one sealed round
+
+| What | Value |
+|---|---|
+| Round | batch `128`, merchant `0`, offers `[206,207,208,209,210]`, block `277518457`, request hash `7effef69365a1921f84aa62cd703a2751edbbd4d49a29f5bc4ad6d2f1dc433b4`, read with `near contract call-function as-read-only longcon4-game.testnet batch json-args '{"batch_id":128}' network-config testnet now` |
+| Who | the page in a browser plus two scripted travelers (`web/scripts/pitch-as.ts`, offers 209 and 210) started within one second; both committed (advance 2 and 3) from the same signed response, tx `44qfnVywwErcC2xaTJYTBnbx5WcmXG1Z5rRVs3nMtJEA` and `4ycH9QdsyLCQauscpU9Sim8ZjNfvmeECwPes4xtkAtJh` |
+| Console | the browser run recorded 0 HTTP errors and 0 network failures from the site origin |

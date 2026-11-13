@@ -68,6 +68,8 @@ let lastTraction: Traction | null = null;
 const wantRecord = Number(new URLSearchParams(location.search).get('record')) || 0;
 let recordShown = false;
 let placed = false;
+let dayHint = '';
+let wantTalk = false;
 
 const GREETING = [
   'Grain, salt, a little credit for honest faces. What brings you to my stall?',
@@ -412,6 +414,15 @@ function seal(o: Offer, oc: Outcome): string {
     </details>`;
 }
 
+/** Days only end at dusk, and an unpaid debt defaults when its due day ends: this is the button that lets the lie travel. */
+function dayControl(o: Offer, oc: Outcome, status?: string): string {
+  if (!st || status === 'repaid') return '';
+  const stops = travelStops(conLandDay(oc.due_day), st.merchants[o.merchant]?.town ?? 0, st.rules.towns, st.day);
+  if (stops.every((s) => s.heard)) return '';
+  return `<div class="actions"><button class="btn small" type="button" data-act="endday" ${ready && !busy ? '' : 'disabled'}><span class="ico s moon"></span>End day ${st.day}</button>
+    <span class="fine">${esc(dayHint || 'Unpaid debts default when their day ends, and the news starts to travel.')}</span></div>`;
+}
+
 /** The lie's road: three towns, the day each hears it. Gold where it already travelled. */
 function route(o: Offer, oc: Outcome): string {
   if (!st) return '';
@@ -498,6 +509,7 @@ function renderVerdict() {
   setHtml(el, `<h3 class="win"><span class="mk"></span>${esc(mn)} lends you <b class="num">${oc.advance}</b> gold</h3>${bars}${clamps}
     <p class="say2">${consequence}</p>
     ${route(o, oc)}
+    ${dayControl(o, oc, debt?.status)}
     <div class="actions">${open && debt ? `<button class="btn small green" type="button" data-act="repay" data-d="${debt.id}" ${pv && pv.gold >= debt.repay && !busy ? '' : 'disabled'}>Pay back ${debt.repay}</button>` : ''}
       <button class="btn small" type="button" data-act="share" data-text="${esc(`I talked ${mn} out of ${oc.advance} gold on the Long Con road. ${tx ? txUrl(cfg.explorer, tx) : location.origin}`)}">${copied === 'loan' ? 'Link copied' : 'Share this loan &#8599;'}</button>
       ${rec ? `<button class="btn small" type="button" data-act="share" data-text="${esc(`${location.origin}/?record=${rec.id}`)}" data-key="con">${copied === 'con' ? 'Link copied' : 'Share my con &#8599;'}</button>` : ''}</div>
@@ -659,6 +671,7 @@ async function refresh() {
       placed = true;
       const quiet = news.reduce((best, n, i) => (n.length < news[best].length ? i : best), 0);
       if (!talking && quiet !== selected) { selected = quiet; world?.standAt(quiet); }
+      if (wantTalk) { wantTalk = false; renderPitchGo(); world?.walkTo(selected); }
     }
     await captureRequest();
   } catch {
@@ -704,6 +717,7 @@ async function act(name: string, args: Record<string, unknown>, label: string) {
   const dayBefore = st?.day ?? 0;
   busy = label;
   errMsg = '';
+  dayHint = '';
   if (name === 'offer') { pendingSince = Date.now(); answeredMs = 0; }
   renderAll();
   try {
@@ -759,6 +773,7 @@ app.addEventListener('click', (ev) => {
   if (a === 'leave') { setTalking(false); return; }
   if (a === 'mute') { toggleMute(); renderHud(); return; }
   if (a === 'pitchgo') {
+    if (!placed) { wantTalk = true; sfx.talkOpen(); return; } // the first state read picks the town; the table opens as soon as it has
     selected = pitchTarget();
     sfx.talkOpen();
     world?.walkTo(selected);
@@ -795,7 +810,12 @@ app.addEventListener('click', (ev) => {
     return;
   }
   if (a === 'repay') { void act('repay_debt', { debt_id: Number(t.dataset.d) }, 'repay'); return; }
-  if (a === 'endday') { void act('advance_day', {}, 'day'); }
+  if (a === 'endday') {
+    const left = dayLeft().left;
+    dayHint = left > 0 ? `Day ${st?.day} has ${left} s of daylight left. The road lets it end at dusk.` : '';
+    if (left > 0) { renderVerdict(); return; }
+    void act('advance_day', {}, 'day');
+  }
 });
 
 setInterval(() => {

@@ -55,7 +55,7 @@ function skeleton() {
     <section class="fverdict panel" id="verdict" aria-live="polite" hidden></section>
     <section class="twins" id="twins" aria-label="The two towns"></section>
     <section class="fproof panel" id="proof" aria-label="Proof"></section>
-    <footer class="ffoot" id="ffoot"></footer>
+    <footer class="ffoot" id="ffoot"><p><b>No wallet, no popups:</b> the relayer pays gas for your session account.</p><p><b>One readable rules file:</b> every cap the contract enforces is in <a href="https://github.com/CryptoInnovators/near-longcon/blob/main/contract/src/rules.rs" target="_blank" rel="noopener">contract/src/rules.rs</a>. Hover a borrower to read the merchant's reasoning.</p><p><b>Items:</b> landed cons mint NEP-245 rumour tokens, see the <a href="/queue">queue game</a>.</p></footer>
   </div>`;
 }
 
@@ -117,7 +117,7 @@ function renderTwins() {
     const win = fork && replayDone() ? richer(fork) === i : false;
     const feed = b ? dayFeed(b).filter((l) => l.day <= idx) : [];
     const loans = b
-      ? b.loans.map((l) => `<li class="${l.accepted && l.advance > 0 ? (l.clamps.length ? 'cut' : 'lent') : 'no'}"><b>${esc(l.name)}</b><span>${l.accepted && l.advance > 0 ? (l.clamps.length ? `lends ${l.advance} of ${l.proposed_advance}` : `lends ${l.advance}`) : 'refused'}</span>${l.clamps.length && l.advance > 0 ? `<em title="${esc(clampSentence(l.clamps[0]))}">cap</em>` : ''}</li>`).join('')
+      ? b.loans.map((l) => `<li title="${esc(l.reason)}" class="${l.accepted && l.advance > 0 ? (l.clamps.length ? 'cut' : 'lent') : 'no'}"><b>${esc(l.name)}</b><span>${l.accepted && l.advance > 0 ? (l.clamps.length ? `lends ${l.advance} of ${l.proposed_advance}` : `lends ${l.advance}`) : 'refused'}</span>${l.clamps.length && l.advance > 0 ? `<em title="${esc(clampSentence(l.clamps[0]))}">cap</em>` : ''}</li>`).join('')
       : CAST.map((c) => `<li class="wait"><b>${esc(c.name)}</b><span>waits</span></li>`).join('');
     return `
     <article class="twin ${win ? 'wins' : ''} ${backed === rule ? 'backed' : ''}" data-rule="${rule}">

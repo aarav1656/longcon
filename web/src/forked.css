@@ -85,7 +85,9 @@
 .fproof .links { margin-top: 8px; font-size: 14px; }
 .fproof .read { margin-top: 6px; color: var(--muted); overflow-wrap: anywhere; }
 .fproof .edit { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
-.ffoot { min-height: 8px; }
+.ffoot { display: grid; gap: 6px; padding: 14px 0 28px; font-size: 13px; opacity: .85; }
+.ffoot p { margin: 0; }
+.ffoot a { color: inherit; text-decoration: underline; }
 .ferr { padding: 48px 8px; color: var(--red-2); }
 
 @media (max-width: 900px) {

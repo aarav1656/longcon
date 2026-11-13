@@ -112,3 +112,40 @@ test('a busy relay retries at 10, 20, 40 s and an unreachable one closes the tab
   expect(relayRetry('TypeError: Failed to fetch', 2).kind).toBe('closed');
   expect(relayRetry('activate 502', 2).kind).toBe('closed');
 });
+
+import { modelShort, travelStops, conLandDay, sealLine, heardLine, answerPhase } from '../src/words.ts';
+
+test('modelShort, conLandDay and travelStops follow the contract news rule', () => {
+  expect(modelShort('Qwen/Qwen3.8-27B')).toBe('Qwen3.8');
+  expect(conLandDay(149)).toBe(150);
+  const stops = travelStops(150, 0, ['Millford', 'Pellgate', 'Oskmoor'], 150);
+  expect(stops.map((s) => [s.name, s.day, s.heard])).toEqual([['Millford', 150, true], ['Pellgate', 151, false], ['Oskmoor', 152, false]]);
+  const mid = travelStops(150, 1, ['Millford', 'Pellgate', 'Oskmoor'], 150);
+  expect(mid.map((s) => s.name)).toEqual(['Pellgate', 'Millford', 'Oskmoor']);
+  expect(mid.filter((s) => s.origin).length).toBe(1);
+});
+
+test('sealLine names the signer kind and never claims a failed check', () => {
+  expect(sealLine('provider_tee', 'Qwen/Qwen3.8-27B', true)).toBe('Signed by Qwen3.8 model in sealed enclave. Checked in browser ✓');
+  expect(sealLine('worker', 'm', true)).toContain('worker key');
+  expect(sealLine('gateway', 'm', false)).toBe('The signature did not verify against the registered key.');
+});
+
+test('heardLine turns a request news line into a sentence', () => {
+  expect(heardLine('- day 142 at Millford: a sob_story pitch won an advance of 9 gold and the traveler defaulted.')).toBe('She heard: sob story landed in Millford on day 142.');
+  expect(heardLine('garbage')).toBe('');
+});
+
+test('answerPhase orders relay trouble, waiting, sending, queued, then the last answer', () => {
+  const base = { relay: 'ok' as const, ready: true, queued: false, pending: false, sending: false, last: null };
+  expect(answerPhase(base)).toBe('idle');
+  expect(answerPhase({ ...base, relay: 'closed', ready: false })).toBe('closed');
+  expect(answerPhase({ ...base, relay: 'busy', ready: false, queued: true })).toBe('busy');
+  expect(answerPhase({ ...base, ready: false, queued: true })).toBe('queued');
+  expect(answerPhase({ ...base, sending: true })).toBe('sending');
+  expect(answerPhase({ ...base, pending: true, sending: true })).toBe('waiting');
+  expect(answerPhase({ ...base, last: { status: 'committed', proposed: 2, clamps: 0 } })).toBe('committed');
+  expect(answerPhase({ ...base, last: { status: 'refused', proposed: 0, clamps: 0 } })).toBe('refused');
+  expect(answerPhase({ ...base, last: { status: 'refused', proposed: 2, clamps: 1 } })).toBe('blocked');
+  expect(answerPhase({ ...base, last: { status: 'timed_out', proposed: 0, clamps: 0 } })).toBe('timed_out');
+});

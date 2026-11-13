@@ -182,3 +182,49 @@ export function relayRetry(err: string, attempt: number): { kind: 'busy' | 'clos
   const unreachable = /failed to fetch|networkerror|load failed|50[234]|timed out/i.test(err);
   return { kind: unreachable && attempt >= 2 ? 'closed' : 'busy', wait: [10, 20, 40][Math.min(attempt, 2)] };
 }
+
+/** `Qwen/Qwen3.8-27B` to `Qwen3.8`: the model name as a person says it. */
+export const modelShort = (model: string): string => (model.split('/').pop() ?? model).replace(/-\d+B.*$/i, '');
+
+export interface Stop { town: number; name: string; day: number; origin: boolean; heard: boolean }
+
+/** The road a con travels: the town it lands in, then each town on the day news arrives (contract rules.rs news_arrives). */
+export function travelStops(landDay: number, origin: number, towns: string[], today: number): Stop[] {
+  return towns
+    .map((name, town) => ({ town, name, day: newsArrives(landDay, origin, town), origin: town === origin, heard: newsArrives(landDay, origin, town) <= today }))
+    .sort((a, b) => a.day - b.day || a.town - b.town);
+}
+
+/** The day a default is written: the contract increments the day first, so a debt due on day D lands its con on day D + 1. */
+export const conLandDay = (dueDay: number): number => dueDay + 1;
+
+/** One line under a settled answer: who signed and that the browser checked it. */
+export function sealLine(kind: string, model: string, signatureOk: boolean): string {
+  if (!signatureOk) return 'The signature did not verify against the registered key.';
+  const who = kind === 'gateway' ? 'the NEAR AI gateway enclave' : kind === 'worker' ? "the operator's worker key" : `${modelShort(model)} model in sealed enclave`;
+  return `Signed by ${who}. Checked in browser ✓`;
+}
+
+/** A news line from the request body as a sentence the player reads: `- day 142 at Millford: a sob_story pitch won an advance of 9 gold and the traveler defaulted.` */
+export function heardLine(line: string): string {
+  const m = line.match(/^- day (\d+) at ([^:]+): a (\w+) pitch won/);
+  return m ? `She heard: ${CLASS_SHORT[m[3]] ?? CLASS_SHORT.other} landed in ${m[2]} on day ${m[1]}.` : '';
+}
+
+export type Phase = 'closed' | 'busy' | 'waiting' | 'sending' | 'queued' | 'timed_out' | 'refused' | 'blocked' | 'committed' | 'idle';
+
+/** Which block the answer area shows. Order is precedence. A refused offer whose merchant said yes was stopped by the road, not by the merchant. */
+export function answerPhase(p: {
+  relay: 'ok' | 'busy' | 'closed'; ready: boolean; queued: boolean; pending: boolean; sending: boolean;
+  last: { status: string; proposed: number; clamps: number } | null;
+}): Phase {
+  if (p.relay === 'closed' && !p.ready) return 'closed';
+  if (p.relay === 'busy' && !p.ready && p.queued) return 'busy';
+  if (p.pending) return 'waiting';
+  if (p.sending) return 'sending';
+  if (p.queued && !p.ready) return 'queued';
+  if (p.last?.status === 'timed_out') return 'timed_out';
+  if (p.last?.status === 'refused') return p.last.proposed > 0 && p.last.clamps > 0 ? 'blocked' : 'refused';
+  if (p.last?.status === 'committed') return 'committed';
+  return 'idle';
+}

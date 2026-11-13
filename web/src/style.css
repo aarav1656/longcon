@@ -351,3 +351,134 @@ footer { font-size: 12px; color: var(--muted); text-align: center; padding: 8px;
 .chip { flex: none; }
 .chip .k { font-size: 13px; white-space: nowrap; }
 .top { grid-template-columns: minmax(0, 1fr) minmax(220px, 380px); }
+
+/* ===================== first-minute layout (TARGET 3 to 6) ===================== */
+.game { width: min(1440px, 100%); padding: 0 0 56px; gap: 0; display: grid;
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto auto; grid-template-rows: 44px 28px 32px auto;
+  grid-template-areas: "logo day purse . tabs mute" "deck day purse . tabs mute" "ticker ticker ticker ticker ticker ticker" "world world world world world world"; }
+.logo { grid-area: logo; padding: 0 0 0 12px; align-self: end; display: block; }
+.logo b { font-size: 30px; line-height: 1; display: block; }
+.deck { grid-area: deck; padding-left: 12px; font-size: 15px; line-height: 28px; color: rgba(246, 236, 214, .8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#daychip { grid-area: day; } #purse { grid-area: purse; }
+.chip { align-self: stretch; margin: 0 4px; border-width: 10px; border-image: url('/art/panel.png') 8 fill / 10px stretch; padding: 0 2px; gap: 8px; min-width: 96px; }
+.chip .v { font-size: 22px; line-height: 1.1; white-space: nowrap; }
+.chip .k { font-size: 13px; line-height: 1.15; white-space: nowrap; }
+.chip .daybar { width: 88px; margin-top: 6px; }
+.chip.due .v, .chip .k.due { color: var(--red-2); }
+.chip.flash { animation: flash 1.2s steps(4); }
+@keyframes flash { 25%, 75% { filter: drop-shadow(0 6px 0 var(--shade)) brightness(1.7); } }
+.mute { grid-area: mute; align-self: center; margin: 0 12px 0 4px; width: 32px; height: 32px; border: 0; padding: 0; display: grid; place-items: center; }
+.roadmap { grid-area: tabs; align-self: center; position: static; aspect-ratio: auto; background: none; box-shadow: none; margin: 0; width: auto; }
+.roadmap #road { display: flex; gap: 6px; }
+.roadmap .town { position: relative; transform: none; width: auto; aspect-ratio: auto; background: var(--navy-2); display: flex; align-items: center; gap: 8px; text-align: left; min-height: 52px; padding: 4px 12px 4px 8px; color: var(--cream); box-shadow: 0 0 0 2px var(--ink); transition: none; }
+.roadmap .town:hover { background: var(--navy-3); transform: none; }
+.roadmap .town::before { display: none; }
+.roadmap .town[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--gold-3); }
+.tsprite { width: 40px; height: 37px; flex: none; background: url('/art/towns.png') 0 0 / 300% 100%; image-rendering: pixelated; }
+.ttext { display: grid; line-height: 1.15; }
+.tn { font-weight: 700; font-size: 15px; }
+.th { font-size: 12px; color: var(--cream-2); }
+.tc { font-size: 12px; color: var(--gold); display: flex; align-items: center; gap: 4px; }
+.tc i { width: 9px; height: 9px; background: var(--gold); box-shadow: 0 0 0 2px var(--ink); }
+.roadmap .town .pin { right: -6px; top: -6px; }
+.ticker { grid-area: ticker; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--ink); box-shadow: inset 0 2px 0 var(--navy-3), inset 0 -2px 0 var(--navy-3); font-size: 15px; white-space: nowrap; overflow: hidden; }
+.ticker .tk { font: 700 12px var(--font); color: var(--gold-ink); background: var(--gold); padding: 1px 6px 2px; flex: none; }
+.ticker #tktext { overflow: hidden; text-overflow: ellipsis; }
+.skel, .skelrow { display: inline-block; height: 20px; vertical-align: middle; background: linear-gradient(90deg, var(--navy-3), var(--navy-2), var(--navy-3)) 0 0 / 200% 100%; animation: shimmer 1.2s linear infinite; }
+.skelrow { display: block; height: 46px; margin-top: 6px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.world { grid-area: world; width: min(100%, calc((100dvh - 104px) * 16 / 9)); max-height: calc(100dvh - 104px); aspect-ratio: 16 / 9; margin: 0; justify-self: center; box-shadow: none; }
+.walkhint { bottom: 8px; }
+.wprompt { display: none; }
+.pitchbar { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); z-index: 4; }
+.pitchbar[hidden] { display: none; }
+.pitchbar .btn { font-size: 20px; min-height: 56px; white-space: nowrap; }
+.pitchbar kbd { font: 700 13px var(--font); padding: 0 6px; border: 2px solid currentColor; opacity: .75; }
+.stage, .lower, .traction, footer { grid-column: 1 / -1; }
+.lower, .traction { margin: 14px 12px 0; }
+footer { padding: 14px 12px; }
+
+/* the table: the scene on the left, one column on the right (R01) */
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 14px; align-items: start; width: 100%; padding: 12px; box-shadow: none; justify-self: stretch; }
+.scene { aspect-ratio: 16 / 9; box-shadow: 0 0 0 4px var(--ink), 0 0 0 8px var(--gold-3); }
+.dialog { position: static; height: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.dialog > .panel { overflow: visible; }
+.face { display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 0; }
+.portrait { width: 72px; height: 86px; flex: none; box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--gold-2); }
+.nameplate { text-align: left; font-size: 22px; }
+.say { font-size: 15px; color: var(--cream-2); margin-top: 4px; }
+.speech .who { font: 700 13px var(--font); letter-spacing: .06em; color: var(--gold); margin-bottom: 4px; }
+.wager { grid-template-columns: 112px 112px minmax(0, 1fr); }
+.wager .btn { min-width: 0; padding: 2px 8px 4px; }
+.verdict h3.win { font-size: 22px; }
+.say2 { font-size: 15px; margin: 8px 0; line-height: 1.4; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.steps { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
+.steps li { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.steps .n { width: 26px; height: 26px; flex: none; display: grid; place-items: center; background: var(--navy-3); font-weight: 700; font-size: 13px; box-shadow: 0 0 0 2px var(--ink); }
+.steps .done .n { background: var(--green); color: var(--ink); }
+.steps .now .n { background: var(--gold); color: var(--gold-ink); animation: blink 1s steps(2) infinite; }
+.steps .todo { opacity: .55; }
+.steps .t { color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 700; }
+.seal { font-size: 14px; color: var(--green-2); margin-top: 10px; }
+.seal.bad { color: var(--red-2); }
+.how summary { cursor: pointer; color: var(--gold); font-size: 14px; margin: 4px 0; }
+.how .fine { margin: 4px 0; }
+.copy { font-size: 12px; border: 2px solid var(--navy-3); background: none; color: var(--cream-2); padding: 0 6px; cursor: pointer; }
+.copy:hover { border-color: var(--gold-3); color: var(--cream); }
+.route { margin: 10px 0; padding: 8px 10px 10px; background: var(--navy-2); box-shadow: 0 0 0 2px var(--ink); }
+.route ol { display: flex; list-style: none; padding: 0; margin: 8px 0 0; }
+.route li { flex: 1; position: relative; display: grid; padding: 6px 8px; margin-right: 16px; border: 2px dashed var(--navy-3); font-size: 13px; line-height: 1.25; }
+.route li:last-child { margin-right: 0; }
+.route li:not(:last-child)::after { content: '\25B8'; position: absolute; right: -16px; top: 50%; transform: translateY(-50%); width: 16px; text-align: center; color: var(--gold); }
+.route li.origin { border: 2px solid var(--gold); background: rgba(250, 200, 76, .14); }
+.route li.gold { border-style: solid; border-color: var(--gold); background: rgba(250, 200, 76, .26); }
+.route li b { color: var(--cream); font-size: 14px; }
+.route li span { color: var(--cream-2); }
+.recs .rec.want { box-shadow: 0 0 0 2px var(--gold); }
+.recs .copy { margin-left: 6px; }
+
+@media (max-width: 1100px) {
+  .stage { grid-template-columns: minmax(0, 1fr); padding: 8px; }
+  .dialog { padding: 0; background: none; }
+  .face .say { display: block; }
+}
+@media (min-width: 1101px) { .say { display: none; } }
+@media (max-width: 700px) {
+  .game { grid-template-columns: minmax(0, 1fr) auto auto auto; grid-template-rows: 56px 22px 28px auto auto; padding-bottom: 96px;
+    grid-template-areas: "logo day purse mute" "deck deck deck deck" "ticker ticker ticker ticker" "world world world world" "tabs tabs tabs tabs"; }
+  .logo { align-self: center; } .logo b { font-size: 24px; }
+  .deck { font-size: 14px; line-height: 22px; }
+  .chip { min-width: 0; margin: 0 2px; padding: 0; } .chip .ico, .chip .k, .chip .daybar { display: none; } .chip .v { font-size: 18px; }
+  .mute { margin-right: 8px; }
+  .ticker { font-size: 13px; }
+  .world { width: 100%; max-height: none; }
+  .pitchbar { position: fixed; left: 0; right: 0; bottom: 0; transform: none; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: var(--night); box-shadow: 0 -4px 0 var(--shade); }
+  .pitchbar .btn { width: 100%; }
+  .roadmap #road { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 8px; }
+  .roadmap .town { min-height: 44px; padding: 4px 8px; justify-content: center; }
+  .tsprite, .th, .tc { display: none; }
+  .roadmap .town .pin { position: static; margin-left: 6px; }
+  .lower, .traction { margin: 14px 8px 0; }
+  .wager { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .route li { margin-right: 12px; padding: 4px 6px; font-size: 12px; } .route li:not(:last-child)::after { right: -13px; width: 12px; }
+}
+.stage { grid-template-columns: minmax(0, 1fr) clamp(440px, 40vw, 560px); }
+.left { display: grid; gap: 14px; min-width: 0; align-content: start; }
+.board { position: static; width: auto; }
+.board ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); column-gap: 14px; }
+.sign .srow { display: none; }
+.sign { max-width: 34%; }
+.bubble { left: 3%; top: 30%; max-width: 38%; }
+.bubble::before { left: auto; right: -15px; clip-path: polygon(0 0, 100% 55%, 0 100%); }
+.bubble::after { left: auto; right: -9px; clip-path: polygon(0 0, 100% 55%, 0 100%); }
+@media (max-width: 1100px) { .stage { grid-template-columns: minmax(0, 1fr); } .board { display: block; } }
+@media (max-width: 700px) { .bubble { left: 3%; top: 34%; max-width: 40%; } .bubble::before, .bubble::after { display: none; } .sign { display: none; } }
+.bubble { left: 38%; top: 5%; max-width: 46%; }
+.bubble::before, .bubble::after { display: none; }
+@media (max-width: 700px) { .bubble { left: 4%; top: 36%; max-width: 54%; } }
+.back { left: 2%; bottom: 3%; top: auto; }
+.chip .v, .tri b, .clock, .traction-grid dd, .sign b, .num { font-family: var(--font); font-weight: 700; }
+.err:empty { display: none; }
+textarea { min-height: 56px; }

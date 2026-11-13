@@ -240,5 +240,12 @@ export function createWorld(canvas: HTMLCanvasElement, onTalk: (m: number) => vo
       if (dir) keys.add({ up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }[dir]);
     },
     act() { if (near >= 0) talk(near); },
+    /** The merchant whose stall the player stands at, or -1. */
+    nearest() { return near; },
+    /** Walk to a merchant's stall and open the table; opens at once when already there. */
+    walkTo(m: number) {
+      if (near === m) { talk(m); return; }
+      if (L) target = { x: L.merchants[m].talk.x, y: L.merchants[m].talk.y, talk: m };
+    },
   };
 }

@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
-import { Chain } from '../src/chain.ts';
+import { describe, expect, test } from 'bun:test';
+import { Chain, explain } from '../src/chain.ts';
 import { KeyPair } from 'near-api-js';
 
 test('view retries RPC rate limits and still fails after non-rate-limit errors', async () => {
@@ -59,4 +59,19 @@ test('the shipped config, which reads drpc first, still gets a second node', asy
   Object.defineProperty(chain.provider, 'callFunction', { value: async () => { throw new Error('HTTP 429'); } });
   Object.defineProperty(fallback, 'callFunction', { value: async () => ({ day: 9 }) });
   expect(await chain.view('state')).toEqual({ day: 9 });
+});
+
+describe('explain', () => {
+  test('a nonce collision becomes a plain sentence, never raw JSON', () => {
+    const raw = '{"ActionError":{"index":0,"kind":{"DelegateActionInvalidNonce":{"ak_nonce":277602161000007,"delegate_nonce":277602161000005}}}}';
+    const s = explain(raw);
+    expect(s).toContain('same moment');
+    expect(s.includes('{')).toBe(false);
+  });
+  test('any other raw JSON also becomes a sentence', () => {
+    expect(explain('{"x":1}').includes('{')).toBe(false);
+  });
+  test('a contract panic keeps its own sentence', () => {
+    expect(explain('Smart contract panicked: the cap is frozen"')).toBe('the cap is frozen');
+  });
 });

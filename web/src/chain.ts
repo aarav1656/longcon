@@ -48,7 +48,7 @@ export const GAS: Record<string, bigint> = {
 
 /** A relayed call the contract rejected: the sentence it wrote and the transaction that carries it. */
 export class ChainError extends Error {
-  constructor(message: string, readonly tx?: string) {
+  constructor(message: string, readonly tx?: string, readonly raw = "") {
     super(message);
   }
 }
@@ -132,8 +132,24 @@ export class Chain {
     throw new Error('the account did not appear on chain in time');
   }
 
-  /** Sign one function call as a NEP-366 delegate and let the relayer pay for it. */
-  async send(method: string, args: Record<string, unknown>): Promise<{ tx?: string; value?: string }> {
+  private lastNonce = 0n;
+  private sending: Promise<unknown> = Promise.resolve();
+
+  /** Sign one function call as a NEP-366 delegate and let the relayer pay for it. Calls from this tab go one at a time and a nonce another tab used first is retried with a fresh one. */
+  send(method: string, args: Record<string, unknown>): Promise<{ tx?: string; value?: string }> {
+    const run = this.sending.then(async () => {
+      for (let attempt = 0; ; attempt++) {
+        try { return await this.sendOnce(method, args); } catch (e) {
+          if (attempt < 3 && /InvalidNonce/.test((e as ChainError).raw ?? "")) { await new Promise((res) => setTimeout(res, 1500)); continue; }
+          throw e;
+        }
+      }
+    });
+    this.sending = run.catch(() => undefined);
+    return run;
+  }
+
+  private async sendOnce(method: string, args: Record<string, unknown>): Promise<{ tx?: string; value?: string }> {
     const pk = this.me.kp.getPublicKey();
     const [key, block] = await Promise.all([
       this.rpc((provider) => provider.viewAccessKey({ accountId: this.me.id, publicKey: pk.toString() })),
@@ -143,10 +159,11 @@ export class Chain {
       senderId: this.me.id,
       receiverId: this.cfg.contract_id,
       actions: [actions.functionCall(method, args, GAS[method] ?? GAS.join, 0n)],
-      nonce: BigInt(key.nonce) + 1n,
+      nonce: (BigInt(key.nonce) > this.lastNonce ? BigInt(key.nonce) : this.lastNonce) + 1n,
       maxBlockHeight: BigInt(block.header.height) + 150n,
       publicKey: pk,
     } as any);
+    this.lastNonce = da.nonce;
     const { signedDelegate } = await new KeyPairSigner(this.me.kp).signDelegateAction(da);
     const r = await fetch(`${this.cfg.relayer}/relay`, {
       method: 'POST',
@@ -154,7 +171,7 @@ export class Chain {
       body: JSON.stringify({ signed_delegate: b64(encodeSignedDelegate(signedDelegate)) }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.ok === false) throw new ChainError(explain(j.error ?? `relay ${r.status}`), j.tx);
+    if (!r.ok || j.ok === false) throw new ChainError(explain(j.error ?? `relay ${r.status}`), j.tx, String(j.error ?? ""));
     return { tx: j.tx, value: j.value };
   }
 }
@@ -162,5 +179,8 @@ export class Chain {
 /** Contract panics arrive wrapped in RPC JSON. Pull out the sentence the contract wrote. */
 export function explain(raw: string): string {
   const m = raw.match(/Smart contract panicked: ([^"\\]+)/);
-  return (m ? m[1] : raw).trim();
+  if (m) return m[1].trim();
+  if (/InvalidNonce/.test(raw)) return "Another window of yours sent a call at the same moment. Try again in a few seconds.";
+  if (/^\s*[{\[]/.test(raw)) return "The network did not accept that call. Try again.";
+  return raw.trim();
 }

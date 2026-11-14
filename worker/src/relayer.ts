@@ -1,5 +1,5 @@
 import { account, env, provider, view } from './chain.ts';
-import { budgets, callFor, clientKey, proxiedClient, toAction, vet } from './delegate.ts';
+import { budgets, callFor, clientKey, failureBody, proxiedClient, toAction, vet } from './delegate.ts';
 import { sleep } from './lib.ts';
 import { parseNearAmount } from 'near-api-js';
 import { existsSync } from 'node:fs';
@@ -130,7 +130,8 @@ Bun.serve({
       }
       return json({ error: 'not found' }, 404);
     } catch (e: any) {
-      return json({ error: String(e?.message ?? e).slice(0, 300) }, 400);
+      const f = failureBody(url.pathname, String(e?.message ?? e).slice(0, 300));
+      return json(f.body, f.status);
     }
   },
 });

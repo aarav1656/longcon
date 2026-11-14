@@ -82,3 +82,7 @@ export function budgets(perClient: number, global: number, windowMs: number) {
     },
   };
 }
+
+/** A relayed call that fails (a nonce another tab used first, a refused action) answers 200 with ok:false so the browser console stays clean; the other routes keep 400 for a malformed request. */
+export const failureBody = (pathname: string, message: string): { status: number; body: { ok?: false; error: string } } =>
+  pathname === '/relay' ? { status: 200, body: { ok: false, error: message } } : { status: 400, body: { error: message } };

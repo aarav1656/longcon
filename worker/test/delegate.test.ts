@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { KeyPair, KeyPairSigner, actions, buildDelegateAction, encodeSignedDelegate } from 'near-api-js';
-import { budgets, clientKey, proxiedClient, vet } from '../src/delegate.ts';
+import { budgets, clientKey, proxiedClient, vet, failureBody } from '../src/delegate.ts';
 
 const CONTRACT = 'longcon.testnet';
 
@@ -65,7 +65,7 @@ test('budgets enforce per-client and shared limits without charging a rejected t
   expect(Array.from({ length: 121 }, (_, i) => global.take(String(i), i)).filter(Boolean)).toHaveLength(120);
 });
 
-import { callFor, joinBudget } from '../src/delegate.ts';
+import { callFor, joinBudget, failureBody } from '../src/delegate.ts';
 
 test('a join delegate becomes a sponsored join for the account that signed it and nothing else does', async () => {
   const join = await make({ method: 'join' });
@@ -101,4 +101,10 @@ for (const method of ['fork_town', 'fork_rule', 'fork_seal', 'fork_settle']) {
 test('the relayer never submits the merchant answer on a visitor behalf', async () => {
   const { bytes } = await make({ method: 'fork_resume' });
   expect(() => vet(bytes, CONTRACT)).toThrow('is not relayed');
+});
+
+test('failureBody: a failed relayed call answers 200 with ok false, other routes keep 400', () => {
+  expect(failureBody('/relay', 'InvalidNonce')).toEqual({ status: 200, body: { ok: false, error: 'InvalidNonce' } });
+  expect(failureBody('/activate', 'bad account')).toEqual({ status: 400, body: { error: 'bad account' } });
+  expect(failureBody('/round', 'bad stall').status).toBe(400);
 });

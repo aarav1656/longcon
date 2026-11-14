@@ -23,12 +23,13 @@ export async function loadConfig(): Promise<Config> {
   return r.json();
 }
 
-/** One ed25519 key per browser. Its public key is the player's implicit NEAR account. */
-export function identity(): Identity {
-  let raw = localStorage.getItem(KEY_SLOT);
+/** One ed25519 key per tab, kept in sessionStorage: a reload keeps the account, two tabs never race over one stored key. */
+export function identity(fresh = false): Identity {
+  let raw: string | null = null;
+  try { raw = fresh ? null : sessionStorage.getItem(KEY_SLOT); } catch { /* storage blocked: the key lives for this load only */ }
   if (!raw) {
     raw = KeyPair.fromRandom('ed25519').toString();
-    localStorage.setItem(KEY_SLOT, raw);
+    try { sessionStorage.setItem(KEY_SLOT, raw); } catch { /* storage blocked */ }
   }
   const kp = KeyPair.fromString(raw as any);
   return { id: hex(kp.getPublicKey().data), kp };
@@ -122,6 +123,14 @@ export class Chain {
   }
 
   /** Ask the relayer to fund the implicit account's storage, then wait until it exists. */
+  /** True when the relayer answers its health route within five seconds. */
+  async relayUp(): Promise<boolean> {
+    try {
+      const r = await fetch(`${this.cfg.relayer}/health`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+      return r.ok && (await r.json()).ok === true;
+    } catch { return false; }
+  }
+
   async activate(timeoutMs = 30_000): Promise<void> {
     if (await this.accountExists()) return;
     const r = await fetch(`${this.cfg.relayer}/activate`, {

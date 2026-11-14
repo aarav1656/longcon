@@ -5,7 +5,6 @@ import { CAST, RULES, blocksToExpiry, blocksToSeconds, canSettleAgain, expiryBlo
 import { clampSentence, esc, shortId, txUrl } from './words.ts';
 
 const FORK_SLOT = 'longcon.fork';
-const KEY_SLOT = 'longcon.player-key';
 const DAY_MS = 700;
 const app = document.getElementById('app')!;
 
@@ -14,6 +13,7 @@ let chain: Chain;
 let ready = false;
 let onboardFailed = false;
 let onboardTry = 0;
+let relayDown = false;
 let fork: Fork | null = null;
 let backed: Rule | null = null;
 let busy = '';
@@ -61,8 +61,8 @@ function skeleton() {
   <div class="fork">
     <header class="ftop">
       <div class="flogo"><b>LONG CON</b><small>Forked Town</small></div>
-      <h1 class="fhero" id="fhero" hidden></h1>
-      <p class="fdeck">Pick a rule. The contract splits the town in two and one signed answer runs through both.</p>
+      <h1 class="fhero" id="fhero">Back a rule. The contract splits the town in two.</h1>
+      <p class="fdeck">One signed merchant answer runs through both towns, and the claim settles on chain.</p>
       <p class="net" id="net"></p>
     </header>
     <section class="controls" id="controls" aria-live="polite"></section>
@@ -99,7 +99,7 @@ function deadlineLeft(): string {
 function renderControls() {
   const picked = !!fork || busy.startsWith('split');
   const label = (r: Rule) => (backed === r ? `Daily loss cap ${r} <small>backed</small>` : `Daily loss cap ${r} <small>${r === 15 ? "the merchant risks 15 gold a day" : "the merchant risks 25 gold a day"}</small>`);
-  const status = busy || (onboardFailed ? 'The account is closed. Press Retry to open it.' : !ready ? (onboardTry > 1 ? `Opening your account on testnet, attempt ${onboardTry} of 6.` : 'Opening your account on testnet.') : !fork ? 'Choose the cap you back. One click splits the town and runs the seven days.' : '');
+  const status = busy || (relayDown ? 'The relayer is not answering. The settled split and every proof below are read live from the chain. Your account opens the moment it answers.' : onboardFailed ? 'The account is closed. Press Retry to open it.' : !ready ? (onboardTry > 1 ? `Opening your account on testnet, attempt ${onboardTry} of 6.` : 'Opening your account on testnet.') : !fork ? 'Choose the cap you back. One click splits the town and runs the seven days.' : '');
   const sealing = fork?.status === 'sealed';
   const waited = sealing ? Date.now() - sealedAt : 0;
   const wait = sealing ? waitState(waited) : 'wait';
@@ -192,11 +192,9 @@ function renderLast() {
   const show = !!f && (!fork || running);
   const el = document.querySelector('#last') as HTMLElement;
   el.hidden = !show;
-  const hero = document.querySelector('#fhero') as HTMLElement;
-  hero.hidden = !show;
   if (!show || !f) return;
-  hero.textContent = verdictLine(f);
   put('#last', `<h2><span class="ico s lock"></span>An earlier split, settled on chain</h2>
+    <p class="fcap">${esc(verdictLine(f))}</p>
     ${deltaHtml(f)}
     <p class="fk">Fork #${f.id} on ${esc(cfg.contract_id)}. ${running || busy.startsWith('split') ? 'Your own split is running below.' : 'Press a cap to run your own.'} Same four pitches, one signed answer from <span class="mono">${esc(f.signer)}</span>, only the cap differs. Settled at block ${f.claim.settled_block}. <a class="txl" href="${esc(cfg.explorer.replace(/\/+$/, ''))}/address/${esc(cfg.contract_id)}" target="_blank" rel="noopener">Contract on explorer</a></p>`);
 }
@@ -206,6 +204,12 @@ const PINNED_FORK = 57;
 const SCAN_FORKS = 40;
 const usable = (f: Fork | null | undefined): f is Fork => !!f && f.status === 'settled' && !!f.divergence?.diverged && !!f.signer;
 
+const LAST_SLOT = 'longcon.last-fork';
+function cacheLast(f: Fork) { try { localStorage.setItem(LAST_SLOT, JSON.stringify(f)); } catch { /* storage blocked */ } }
+function cachedLast(): Fork | null {
+  try { const f = JSON.parse(localStorage.getItem(LAST_SLOT) ?? 'null'); return usable(f) ? f : null; } catch { return null; }
+}
+
 async function loadLast() {
   const pinned = readFork(chain, PINNED_FORK).catch(() => null);
   try {
@@ -213,7 +217,7 @@ async function loadLast() {
     for (let hi = n; hi > 0 && hi > n - SCAN_FORKS; hi -= 4) {
       const ids = [hi, hi - 1, hi - 2, hi - 3].filter((id) => id > 0);
       const found = (await Promise.all(ids.map((id) => readFork(chain, id).catch(() => null)))).find(usable);
-      if (found) { lastFork = found; break; }
+      if (found) { lastFork = found; cacheLast(found); break; }
       if (!lastFork) {
         const f = await pinned;
         if (usable(f)) { lastFork = f; renderLast(); }
@@ -222,7 +226,7 @@ async function loadLast() {
   } catch { /* the pinned fork below still answers */ }
   if (!lastFork) {
     const f = await pinned;
-    if (usable(f)) lastFork = f;
+    if (usable(f)) { lastFork = f; cacheLast(f); }
   }
   renderLast();
 }
@@ -279,15 +283,25 @@ function renderProof() {
 }
 
 function renderNet() {
-  put('#net', `<span class="fdot ${ready ? 'on' : ''}"></span>${ready ? 'NEAR testnet, account ready' : onboardFailed ? 'NEAR testnet, account closed' : 'NEAR testnet, opening account'}`);
+  put('#net', `<span class="fdot ${ready ? 'on' : ''}"></span>${ready ? 'NEAR testnet, account ready' : relayDown ? 'NEAR testnet, relayer not answering' : onboardFailed ? 'NEAR testnet, account closed' : 'NEAR testnet, opening account'}`);
 }
 
 function render() {
   renderNet(); renderQueue(); renderControls(); renderLast(); renderTwins(); renderVerdict(); renderProof();
 }
 
+/** Probes the relayer before the first attempt; while it is silent the page says so at once and keeps the chain reads running, then opens the account when it answers. */
+async function waitRelay() {
+  while (!(await chain.relayUp())) {
+    if (!relayDown) { relayDown = true; render(); }
+    do { await nap(6000); } while (document.visibilityState !== 'visible');
+  }
+  if (relayDown) { relayDown = false; render(); }
+}
+
 async function onboard() {
   onboardFailed = false; notice = null; onboardTry = 0;
+  await waitRelay();
   const ATTEMPTS = 6;
   let last = '';
   for (let k = 1; k <= ATTEMPTS && !ready; k++) {
@@ -335,8 +349,7 @@ async function pick(rule: Rule) {
       if (!ready) throw new Error('the account is not open yet, press Retry');
       let before = await myForkIds();
       if (before.length >= 3) {
-        localStorage.removeItem(KEY_SLOT);
-        chain = new Chain(cfg, identity());
+        chain = new Chain(cfg, identity(true));
         ready = false; txs = []; render();
         await onboard();
         before = [];
@@ -470,6 +483,7 @@ async function boot() {
   cfg = await loadConfig();
   chain = new Chain(cfg, identity());
   skeleton();
+  lastFork = cachedLast();
   render();
   app.addEventListener('click', (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-cap],[data-act]');

@@ -75,3 +75,25 @@ describe('explain', () => {
     expect(explain('Smart contract panicked: the cap is frozen"')).toBe('the cap is frozen');
   });
 });
+
+describe('relay probe and per-tab identity', () => {
+  const mk = () => new Chain({ contract_id: 'road.testnet', network: 'sandbox', rpc: 'http://rpc', relayer: '/api/relay', explorer: '' }, { id: 'p', kp: KeyPair.fromRandom('ed25519') });
+  const realFetch = globalThis.fetch;
+  test('relayUp is true only when the health route answers ok', async () => {
+    globalThis.fetch = (async () => new Response('{"ok":true}', { status: 200 })) as typeof fetch;
+    expect(await mk().relayUp()).toBe(true);
+    globalThis.fetch = (async () => new Response('{"error":"relayer offline"}', { status: 503 })) as typeof fetch;
+    expect(await mk().relayUp()).toBe(false);
+    globalThis.fetch = (async () => { throw new Error('network'); }) as typeof fetch;
+    expect(await mk().relayUp()).toBe(false);
+    globalThis.fetch = realFetch;
+  });
+  test('identity keeps one key per tab and mints a fresh one on request', async () => {
+    const store = new Map<string, string>();
+    (globalThis as any).sessionStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    const { identity } = await import('../src/chain.ts');
+    const a = identity();
+    expect(identity().id).toBe(a.id);
+    expect(identity(true).id).not.toBe(a.id);
+  });
+});

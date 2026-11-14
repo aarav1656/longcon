@@ -4,6 +4,7 @@ import { sleep } from './lib.ts';
 import { parseNearAmount } from 'near-api-js';
 import { existsSync } from 'node:fs';
 import { loadRivals, makeConductor, PERSONAS } from './rivals.ts';
+import { RPC_POOL, forward } from '../../web/src/rpcproxy.ts';
 
 const contractId = env('CONTRACT_ID');
 const p = provider();
@@ -22,6 +23,17 @@ const rivalsFile = process.env.RIVALS_FILE ?? `${process.env.HOME}/.config/longc
 const rivals = existsSync(rivalsFile) ? loadRivals(rivalsFile, p) : new Map();
 const openRound = makeConductor(contractId, p, rivals, (id) => PERSONAS.find((x) => id.startsWith(`${x.slug}`))?.slug ?? '');
 const opening = new Set<number>();
+
+/** JSON-RPC reads for the page: the same upstream pool and rate-limit answer the Pages function used, served from the relayer so reads do not depend on a Cloudflare request quota. */
+async function rpcRelay(req: Request): Promise<Response> {
+  const body = await req.text();
+  if (body.length > 20_000) return json({ error: 'request too large' }, 413);
+  const out = await forward(body, RPC_POOL);
+  if (out) return new Response(out.body, { status: out.status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...cors } });
+  let id: unknown = null;
+  try { id = JSON.parse(body).id ?? null; } catch { /* keep null */ }
+  return json({ jsonrpc: '2.0', id, error: { code: -32011, message: 'rate limit: every upstream node is busy, retry shortly' } });
+}
 
 const hits = new Map<string, number[]>();
 function limited(who: string): boolean {
@@ -85,6 +97,7 @@ Bun.serve({
       clientKey(req.headers.get('x-forwarded-for'), server.requestIP(req)?.address ?? null, process.env.TRUST_PROXY === '1'));
     try {
       if (url.pathname === '/health') return json({ ok: true, contract: contractId, relayer: relayer.accountId });
+      if (url.pathname === '/rpc' && req.method === 'POST') return await rpcRelay(req);
       if (limited(who)) return json({ error: 'slow down' }, 429);
       if (url.pathname === '/activate' && req.method === 'POST') {
         const { account_id } = (await req.json()) as { account_id: string };

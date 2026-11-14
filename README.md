@@ -62,7 +62,7 @@ The game and ledger default to `longcon4-game.testnet`. Set up that testnet road
 After logging in to Cloudflare, build and deploy the playable client and its live finalized receipt activity:
 
 ```sh
-cd web && bun run build && npx wrangler pages deploy dist --project-name longcon-near-hackathon
+cd web && bun run build && npx wrangler pages deploy dist --project-name near-longcon --branch main
 ```
 
 ## Ledger page

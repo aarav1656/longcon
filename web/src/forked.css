@@ -200,13 +200,4 @@
 
 .fhero { grid-column: 1 / -1; grid-row: 2; margin: 0; font-size: clamp(22px, 3.2vw, 38px); line-height: 1.12; color: var(--gold); text-shadow: 0 3px 0 var(--ink); text-wrap: balance; max-width: 30ch; }
 .fhero[hidden] { display: none; }
-.fdual { padding: 6px 0 2px; }
-.dual { width: 100%; max-width: 560px; height: auto; display: block; background: var(--night); box-shadow: 0 0 0 2px var(--navy-3); }
-.dual polyline { fill: none; stroke-width: 3; stroke-linejoin: round; }
-.dual polyline.l0, .dual circle.l0 { stroke: var(--gold); fill: var(--gold); }
-.dual polyline.l1, .dual circle.l1 { stroke: var(--green-2); fill: var(--green-2); }
-.dual polyline { fill: none !important; }
-.dual text { font: 600 12px var(--font); }
-.dual text.t0 { fill: var(--gold); }
-.dual text.t1 { fill: var(--green-2); }
 @media (max-width: 900px) { .fhero { grid-row: auto; order: 1; } .ftop .fdeck { order: 2; } .ftop .net { order: 3; } }

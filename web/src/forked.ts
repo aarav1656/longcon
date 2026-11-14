@@ -130,20 +130,6 @@ function chart(i: number, idx: number): string {
   return `<svg viewBox="0 0 300 80" class="chart" role="img" aria-label="Merchant gold by day, cap ${fork!.branches[i].rule}">${mark}<polyline points="${pts}"/>${dots}</svg>`;
 }
 
-/** Both towns' gold by day on one chart, so the two futures share a screen at any width. */
-function dualChart(f: Fork, idx: number): string {
-  const all = f.branches.flatMap((b) => b.rows.map((r) => r.gold));
-  const lo = Math.min(...all) - 4, hi = Math.max(...all) + 4;
-  const x = (d: number) => 10 + (d * 250) / 7;
-  const y = (g: number) => 10 + (1 - (g - lo) / Math.max(1, hi - lo)) * 90;
-  const lines = f.branches.map((b, i) => {
-    const pts = b.rows.slice(0, idx + 1).map((r, d) => `${x(d).toFixed(1)},${y(r.gold).toFixed(1)}`).join(' ');
-    const last = b.rows[Math.min(idx, b.rows.length - 1)];
-    return `<polyline class="l${i}" points="${pts}"/><circle class="l${i}" cx="${x(Math.min(idx, 7)).toFixed(1)}" cy="${y(last.gold).toFixed(1)}" r="4"/><text class="t${i}" x="${(x(Math.min(idx, 7)) + 8).toFixed(1)}" y="${(y(last.gold) + 4).toFixed(1)}">cap ${b.rule} ${last.gold}</text>`;
-  }).join('');
-  return `<svg viewBox="0 0 340 110" class="dual" role="img" aria-label="Merchant gold by day: cap ${f.branches[0].rule} against cap ${f.branches[1].rule}">${lines}</svg>`;
-}
-
 function renderTwins() {
   const idx = dayIdx();
   const panes = RULES.map((rule, i) => {
@@ -234,7 +220,6 @@ function renderVerdict() {
   if (notice) body += `<p class="fnote ${notice.kind}" role="alert">${esc(notice.text)}${notice.tx ? ` ${tx(notice.tx, 'transaction')}` : ''}</p>`;
   if (fork && replayDone()) {
     const c = fork.claim;
-    body += `<div class="fdual">${dualChart(fork, 7)}</div>`;
     const line = c.status === 'won' ? `You backed the cap of ${fork.backed_rule}. It kept more gold, so the claim wins ${c.payout} gold.`
       : c.status === 'lost' ? `You backed the cap of ${fork.backed_rule}. The other rule kept more gold, so the claim loses.`
       : c.status === 'draw' ? `You backed the cap of ${fork.backed_rule}. Both towns end level, so the claim draws.`
@@ -246,7 +231,7 @@ function renderVerdict() {
     body += `<h2>${esc(verdictLine(fork))}</h2><p class="claim ${c.status}">${esc(line)}${settled ? ` ${tx(settled.tx, 'settlement')}` : ''}</p>
       <p class="fclock">Rule pick to settled claim: <b class="num">${doneAt || elapsed()} s</b> <button class="btn small" type="button" data-act="again">Split another town</button></p>`;
   } else if (fork && fork.status !== 'open' && fork.status !== 'sealed') {
-    body += `<h2>Seven days pass in the two towns.</h2><div class="fdual">${dualChart(fork, Math.max(0, dayIdx()))}</div><p class="claim">Day ${Math.max(0, dayIdx())} of 7. The proof below is already final.</p>`;
+    body += `<h2>Seven days pass in the two towns.</h2><p class="claim">Day ${Math.max(0, dayIdx())} of 7. The proof below is already final.</p>`;
   }
   put("#verdict", body);
   (document.querySelector("#verdict") as HTMLElement).hidden = !body;

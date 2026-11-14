@@ -65,6 +65,8 @@ After logging in to Cloudflare, build and deploy the playable client and its liv
 scripts/deploy-worker.sh
 ```
 
+The relayer stays on the host that holds its keys. That host dials out to the Worker with `HUB_SECRET=$(cat ~/.config/longcon/hub-secret) bun scripts/hub-agent.ts`, and `/api/relay/*` then reaches it at the Worker's fixed address with no inbound tunnel. Set the secret once with `wrangler secret put HUB_SECRET --name near-longcon`.
+
 ## Ledger page
 
 `web/index.html` is a static page that reads the contract straight from the NEAR RPC: no build step, no packages, no server of ours. It shows what the contract holds and nothing else.

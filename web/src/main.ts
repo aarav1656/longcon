@@ -947,7 +947,7 @@ async function boot() {
   setInterval(() => { if (relay.kind === 'busy' && !ready) renderVerdict(); }, 1000);
   void onboard();
   await refresh();
-  setInterval(() => { void refresh(); }, pendingSince ? 1500 : 5000);
+  setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 10_000);
   setInterval(() => { if (pv?.pending_offer) { seenKey = ''; void refresh(); } }, 1500);
   let roundBusy = false;
   setInterval(async () => {

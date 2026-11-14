@@ -1,0 +1,7 @@
+{
+  "name": "longcon",
+  "private": true,
+  "scripts": {
+    "test": "(cd worker && bun install --frozen-lockfile && bun test ./test) && (cd web && bun install --frozen-lockfile && bun test ./test)"
+  }
+}

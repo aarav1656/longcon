@@ -130,13 +130,16 @@ function renderTwins() {
     const row = b && idx >= 0 ? b.rows[idx] : null;
     const gold = row ? row.gold : fork ? fork.purse : openPurse;
     const lost = b && idx > 0 ? stampFor(b, idx) : 0;
-    const win = fork && replayDone() ? richer(fork) === i : false;
+    const done = !!fork && replayDone();
+    const win = done ? richer(fork!) === i : false;
+    const behind = done && !win && richer(fork!) !== null;
+    const debt = done && b ? b.rows[b.rows.length - 1].lost : 0;
     const feed = b ? dayFeed(b).filter((l) => l.day <= idx) : [];
     const loans = b
       ? b.loans.map((l) => `<li title="${esc(l.reason)}" class="${l.accepted && l.advance > 0 ? (l.clamps.length ? 'cut' : 'lent') : 'no'}"><b>${esc(l.name)}</b><span>${l.accepted && l.advance > 0 ? (l.clamps.length ? `lends ${l.advance} of ${l.proposed_advance}` : `lends ${l.advance}`) : 'refused'}</span>${l.clamps.length && l.advance > 0 ? `<em title="${esc(clampSentence(l.clamps[0]))}">cap</em>` : ''}</li>`).join('')
       : CAST.map((c) => `<li class="wait"><b>${esc(c.name)}</b><span>waits</span></li>`).join('');
     return `
-    <article class="twin ${win ? 'wins' : ''} ${backed === rule ? 'backed' : ''}" data-rule="${rule}">
+    <article class="twin ${win ? 'wins' : ''} ${behind ? 'behind' : ''} ${backed === rule ? 'backed' : ''}" data-rule="${rule}">
       <div class="fscene">
         <img class="layer" alt="" src="/art/town0-back.png"><div class="merchant" data-m="0" data-mood="${b && lost ? 'stern' : b && row ? 'pleased' : fork?.status === 'sealed' ? 'think' : 'idle'}" role="img" aria-label="${esc(merchantName)}"></div><img class="layer" alt="" src="/art/town0-front.png">
         <div class="ftag"><h2>Daily loss cap ${rule}</h2><p>At most ${rule} gold may come due on one day.</p></div>
@@ -144,6 +147,7 @@ function renderTwins() {
         <div class="pursebar"><span class="fcoin"></span><b class="num">${gold ?? '–'}</b><span class="fk">${row ? `day ${idx}` : 'purse'}</span></div>
         ${b ? `<div class="fchartbox">${chart(i, Math.max(0, idx))}</div>` : ""}
         ${lost ? `<div class="fstamp">DEFAULT −${lost}</div>` : ''}
+        ${done && debt > 0 && !lost ? `<div class="fdebt${behind ? ' deep' : ''}"><b class="num">−${debt}</b><span>gold lost to an unpaid loan</span></div>` : ''}
         ${win ? '<div class="crown">KEEPS MORE GOLD</div>' : ''}
       </div>
       <div class="ledger">

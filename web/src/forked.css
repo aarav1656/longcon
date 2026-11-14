@@ -178,3 +178,7 @@
 .pitches { margin-top: 6px; }
 .pitches summary { cursor: pointer; color: var(--gold); font-size: 14px; }
 @media (max-width: 900px) { .controls { grid-template-columns: minmax(0, 1fr); } }
+.controls .btn small { display: block; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 12px; margin-top: 2px; }
+.controls .btns .btn.big { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2px; line-height: 1.15; }
+.controls .btns .btn.big small { margin-top: 0; }
+.controls .btns .btn.big:disabled:not(.gold) { opacity: .55; }

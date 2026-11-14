@@ -82,7 +82,7 @@ function stage(): number {
 
 function renderControls() {
   const picked = !!fork || busy.startsWith('split');
-  const label = (r: Rule) => (backed === r ? `Daily loss cap ${r} <small>backed</small>` : `Daily loss cap ${r}`);
+  const label = (r: Rule) => (backed === r ? `Daily loss cap ${r} <small>backed</small>` : `Daily loss cap ${r} <small>${r === 15 ? "the merchant risks 15 gold a day" : "the merchant risks 25 gold a day"}</small>`);
   const status = busy || (onboardFailed ? 'The account is closed. Press Retry to open it.' : !ready ? (onboardTry > 1 ? `Opening your account on testnet, attempt ${onboardTry} of 6.` : 'Opening your account on testnet.') : !fork ? 'Choose the cap you back. One click splits the town and runs the seven days.' : '');
   const sealing = fork?.status === 'sealed';
   const waited = sealing ? Date.now() - sealedAt : 0;
@@ -169,15 +169,15 @@ function renderLast() {
   const el = document.querySelector('#last') as HTMLElement;
   el.hidden = !show;
   if (!show || !f) return;
-  put('#last', `<h2><span class="ico s lock"></span>Last split, settled on chain</h2>
+  put('#last', `<h2><span class="ico s lock"></span>An earlier split, settled on chain</h2>
     ${deltaHtml(f)}
-    <p class="fk">Fork #${f.id} on ${esc(cfg.contract_id)}. Same four pitches, one signed answer from <span class="mono">${esc(f.signer)}</span>, only the cap differs. Settled at block ${f.claim.settled_block}. <a class="txl" href="${esc(cfg.explorer.replace(/\/+$/, ''))}/address/${esc(cfg.contract_id)}" target="_blank" rel="noopener">Contract on explorer</a></p>`);
+    <p class="fk">Fork #${f.id} on ${esc(cfg.contract_id)}. Press a cap to run your own. Same four pitches, one signed answer from <span class="mono">${esc(f.signer)}</span>, only the cap differs. Settled at block ${f.claim.settled_block}. <a class="txl" href="${esc(cfg.explorer.replace(/\/+$/, ''))}/address/${esc(cfg.contract_id)}" target="_blank" rel="noopener">Contract on explorer</a></p>`);
 }
 
 async function loadLast() {
   try {
     const n = Number(await chain.view<number>('fork_count'));
-    for (let id = n - 1; id >= Math.max(0, n - 12); id--) {
+    for (let id = n; id >= Math.max(0, n - 11); id--) {
       const f = await readFork(chain, id);
       if (f && f.status === 'settled' && f.divergence?.diverged && f.signer) { lastFork = f; break; }
     }

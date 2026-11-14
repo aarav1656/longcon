@@ -59,8 +59,8 @@ const SIGNATURE_WINDOW_MS = 30_000;
 
 /**
  * Send the contract-built request byte for byte, then obtain a signature over
- * model:sha256(request):sha256(response). A model call slower than hedgeMs gets a second
- * identical call racing it (up to three in flight): either readable answer is a valid signed
+ * model:sha256(request):sha256(response). A model call slower than hedgeMs gets another
+ * identical call racing it (up to four in flight): either readable answer is a valid signed
  * answer, so the first wins and the rest are aborted. A readable answer is never thrown away
  * for lack of time: its signature lookup gets its own window past the model deadline.
  */
@@ -70,7 +70,7 @@ export async function answer(
   slots: number,
   deadline: number,
   onAttempt?: (chatId: string, status: number) => void,
-  hedgeMs = 20_000,
+  hedgeMs = 8_000,
 ): Promise<Answered> {
   const reqHash = sha256Hex(requestBody);
   let attempts = 0;
@@ -125,7 +125,7 @@ export async function answer(
       });
     };
     const hedge = setInterval(() => {
-      if (!over && running < 3 && timeLeft()) spawn();
+      if (!over && running < 4 && timeLeft()) spawn();
     }, hedgeMs);
     spawn();
   });

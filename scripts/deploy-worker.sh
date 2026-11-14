@@ -8,7 +8,7 @@ t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 git -C "$repo" archive HEAD web contract/src/rules.rs | tar -x -C "$t"
 rm -rf "$t/web/node_modules" && cp -Rc "$repo/web/node_modules" "$t/web/node_modules"  # APFS clone: instant, and tsc resolves types inside the tree
 cd "$t/web"
-bun run build && cp index.html dist/ledger.html && cp app.js style.css dist/
+bun run build && cp index.html dist/ledger.html && cp dist/game.html dist/index.html && cp app.js style.css dist/
 npx -y wrangler@latest pages functions build functions --outdir "$t/out"
 cp hub/entry.js "$t/entry.js"
 cat > "$t/wrangler.toml" <<TOML

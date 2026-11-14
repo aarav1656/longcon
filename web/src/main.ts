@@ -4,6 +4,7 @@ import { loadTraction, renderTraction, type Traction } from './traction.ts';
 import { createWorld } from './world.ts';
 import { sfx, startMusic, toggleMute, muted } from './sfx.ts';
 import { queueHtml, rankBatch, sealIn, type QOffer, type Ranked, type RoundView } from './queue.ts';
+import { POLL_MS } from './poll.ts';
 import { checkPitch, classLabel, classShort, clampSentence, esc, newsArrives, shortId, txUrl, answeredLine, newsLines, sha256Hex, signatureValid, purseLines, tickerLine, relayRetry, travelStops, conLandDay, sealLine, heardLine, answerPhase } from './words.ts';
 
 interface Merchant { id: number; name: string; town: number; gold: number; grain: number; outstanding: number; buy_price: number; sell_price: number; lost_total: number; town_name: string; treasury_room: number; due_exposure: number[] }
@@ -947,18 +948,18 @@ async function boot() {
   setInterval(() => { if (relay.kind === 'busy' && !ready) renderVerdict(); }, 1000);
   void onboard();
   await refresh();
-  setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 10_000);
-  setInterval(() => { if (pv?.pending_offer) { seenKey = ''; void refresh(); } }, 1500);
+  setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, POLL_MS);
+  setInterval(() => { if (document.visibilityState === 'visible' && pv?.pending_offer) { seenKey = ''; void refresh(); } }, POLL_MS);
   let roundBusy = false;
   setInterval(async () => {
-    if (!placed || roundBusy) return;
+    if (!placed || roundBusy || document.visibilityState !== 'visible') return;
     roundBusy = true;
     try {
       await refreshRound().catch(() => {});
       if (!round.requested && round.phase === 'none') { round.requested = true; await openRound(); }
       renderQueue();
     } finally { roundBusy = false; }
-  }, 1500);
+  }, POLL_MS);
   $('#pitch').addEventListener('input', renderQueue);
   $('#ask').addEventListener('input', renderQueue);
 }

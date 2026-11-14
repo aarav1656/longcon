@@ -1,3 +1,4 @@
+import { pollPause } from './poll.ts';
 import { JsonRpcProvider, KeyPair, KeyPairSigner, actions, buildDelegateAction, encodeSignedDelegate } from 'near-api-js';
 
 export interface Config {
@@ -143,7 +144,7 @@ export class Chain {
     const end = Date.now() + timeoutMs;
     while (Date.now() < end) {
       if (await this.accountExists()) return;
-      await new Promise((res) => setTimeout(res, 800));
+      await pollPause();
     }
     throw new Error('the account did not appear on chain in time');
   }

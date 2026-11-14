@@ -1,5 +1,6 @@
 import './style.css';
 import './forked.css';
+import { pollPause } from './poll.ts';
 import { Chain, ChainError, identity, loadConfig, type Config } from './chain.ts';
 import { CAST, RULES, blocksToExpiry, blocksToSeconds, canSettleAgain, expiryBlock, dayFeed, readFork, readHealth, richer, verdictLine, waitState, type Branch, type Fork, type Rule } from './fork.ts';
 import { clampSentence, esc, shortId, txUrl } from './words.ts';
@@ -294,7 +295,7 @@ function render() {
 async function waitRelay() {
   while (!(await chain.relayUp())) {
     if (!relayDown) { relayDown = true; render(); }
-    do { await nap(6000); } while (document.visibilityState !== 'visible');
+    await pollPause();
   }
   if (relayDown) { relayDown = false; render(); }
 }
@@ -310,7 +311,7 @@ async function onboard() {
       await chain.activate(60_000);
       if (!(await chain.view('player', { account_id: chain.me.id }))) {
         await chain.send('join', {});
-        for (let j = 0; j < 60 && !(await chain.view('player', { account_id: chain.me.id })); j++) await nap(800);
+        for (let j = 0; j < 60 && !(await chain.view('player', { account_id: chain.me.id })); j++) await pollPause();
       }
       ready = true;
     } catch (e) {
@@ -358,7 +359,7 @@ async function pick(rule: Rule) {
       let id = Number(split.value ?? -1);
       if (!Number.isInteger(id)) id = -1;
       for (let k = 0; k < 40 && id < 0; k++) {
-        await nap(700);
+        await pollPause();
         const now = await myForkIds();
         const fresh = now.filter((x) => !before.includes(x));
         if (fresh.length) id = fresh[fresh.length - 1];
@@ -417,7 +418,7 @@ async function expire() {
 async function follow() {
   let tick = 0;
   while (fork && fork.status === 'sealed') {
-    await nap(1200);
+    await pollPause();
     try {
       fork = (await readFork(chain, fork.id)) ?? fork;
       if (fork.status === 'sealed' && (tick++ % 5 === 0 || blocksToExpiry(fork, estHeight()) === 0)) { heightNow = await chain.height(); heightAt = Date.now(); }

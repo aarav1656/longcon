@@ -44,7 +44,8 @@ test('merchants show treasury, loans and the cap they are held to', () => {
 test('the default road in config.json is the new testnet road', () => {
   const cfg = JSON.parse(readFileSync(new URL('../public/config.json', import.meta.url), 'utf8'));
   expect(cfg.contract_id).toBe('longcon4-game.testnet');
-  expect(cfg.rpc).toBe('https://teslas-mac-mini.tail57f771.ts.net/longcon-relay/rpc');
+  expect(cfg.rpc).toBe(`${cfg.relayer}/rpc`);
+  expect(cfg.relayer).toMatch(/^https:\/\/[a-z0-9.-]+$/);
 });
 
 test('the ledger page compares the registered model key with its published report', () => {

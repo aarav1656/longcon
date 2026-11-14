@@ -21,7 +21,7 @@ The visitor picks a daily loss cap (15 or 25). The contract clones the town into
 | Testnet traveler journeys and merchant offers are recorded against `longcon4-game.testnet`. | [Offer transaction](https://testnet.nearblocks.io/txns/5PtncDpBSAtv3K9BfbN5UTHruimTQdnrriQrhjXWn7rX), [signed batch answer](https://testnet.nearblocks.io/txns/DHFskY1oSysVbwuHbqzADuE2J48YK5APKEVoxoNsRYxF); [`scripts/play.sh`](scripts/play.sh), details in [docs/EVIDENCE.md](docs/EVIDENCE.md). |
 | A sealed batch of concurrent traveler answers was recorded and verified on chain. | Batch resume tx [9X3PFF9aJNN1Bvu4mdsb9JrUMPdSBVaD3D5hvEMU15fY](https://testnet.nearblocks.io/txns/9X3PFF9aJNN1Bvu4mdsb9JrUMPdSBVaD3D5hvEMU15fY), `npc_resume_batch` with the signature checked by the contract. |
 | The live app, relayer health and contract are reachable from the public URL. | `curl -s https://near-longcon.nearlive.workers.dev/api/health`, `curl -s https://near-longcon.nearlive.workers.dev/config.json`, `curl -s https://near-longcon.nearlive.workers.dev/rules.rs.txt \| head`. |
-| Git history records `kamalbuilds` as commit author from 2026-10-31 through 2026-11-14. | `git log --reverse --format='%ad %an' --date=short`; `git log -1 --format='%ad %an' --date=short`. |
+| Git history records `kamalbuilds` as commit author from 2026-10-31 through the latest commit. | `git log --reverse --format='%ad %an' --date=short`; `git log -1 --format='%ad %an' --date=short`. |
 
 ## Try it in 60 seconds
 
@@ -33,4 +33,4 @@ NEAR stores the game state, verifies merchant answer signatures, and supports sp
 
 ## Team and build window
 
-Git history records `kamalbuilds` as commit author from 2026-10-31 to 2026-11-14. The dates come from the first and latest commits; see the commands in the evidence table.
+Git history records `kamalbuilds` as commit author from 2026-10-31 to the latest commit. The dates come from the first and latest commits; see the commands in the evidence table.

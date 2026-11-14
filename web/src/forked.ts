@@ -67,10 +67,10 @@ function skeleton() {
       <p class="net" id="net"></p>
     </header>
     <section class="controls" id="controls" aria-live="polite"></section>
-    <section class="flast panel" id="last" aria-label="Last split on chain" hidden></section>
-    <section class="fqueue" id="queue" aria-label="The queue at the stall"></section>
     <section class="fverdict panel" id="verdict" aria-live="polite" hidden></section>
     <section class="twins" id="twins" aria-label="The two towns"></section>
+    <section class="flast" id="last" aria-label="Earlier split on chain" hidden></section>
+    <section class="fqueue" id="queue" aria-label="The queue at the stall"></section>
     <section class="fproof panel" id="proof" aria-label="Proof"></section>
     <footer class="ffoot" id="ffoot"><p><b>No wallet, no popups:</b> the relayer pays gas for your session account.</p><p><b>One readable rules file:</b> every cap the contract enforces is in <a href="/rules.rs.txt" target="_blank" rel="noopener">contract/src/rules.rs</a>. Hover a borrower to read the merchant's reasoning.</p><p><b>Items:</b> landed cons mint NEP-245 rumour tokens, see the <a href="/queue">queue game</a>.</p></footer>
   </div>`;
@@ -100,7 +100,7 @@ function deadlineLeft(): string {
 function renderControls() {
   const picked = !!fork || busy.startsWith('split');
   const label = (r: Rule) => (backed === r ? `Daily loss cap ${r} <small>backed</small>` : `Daily loss cap ${r} <small>${r === 15 ? "the merchant risks 15 gold a day" : "the merchant risks 25 gold a day"}</small>`);
-  const status = busy || (relayDown ? 'The relayer is not answering. The settled split and every proof below are read live from the chain. Your account opens the moment it answers.' : onboardFailed ? 'The account is closed. Press Retry to open it.' : !ready ? (onboardTry > 1 ? `Opening your account on testnet, attempt ${onboardTry} of 6.` : 'Opening your account on testnet.') : !fork ? 'Choose the cap you back. One click splits the town and runs the seven days.' : '');
+  const status = busy || (relayDown ? 'The relayer is not answering. The settled split and every proof below are read live from the chain. Your account opens the moment it answers.' : onboardFailed ? 'The account is closed. Press Retry to open it.' : !ready ? '' : !fork ? 'Choose the cap you back. One click splits the town and runs the seven days.' : '');
   const sealing = fork?.status === 'sealed';
   const waited = sealing ? Date.now() - sealedAt : 0;
   const wait = sealing ? waitState(waited) : 'wait';
@@ -193,10 +193,12 @@ function renderLast() {
   const el = document.querySelector('#last') as HTMLElement;
   el.hidden = !show;
   if (!show || !f) return;
-  put('#last', `<h2><span class="ico s lock"></span>An earlier split, settled on chain</h2>
-    <p class="fcap">${esc(verdictLine(f))}</p>
-    ${deltaHtml(f)}
-    <p class="fk">Fork #${f.id} on ${esc(cfg.contract_id)}. ${running || busy.startsWith('split') ? 'Your own split is running below.' : 'Press a cap to run your own.'} Same four pitches, one signed answer from <span class="mono">${esc(f.signer)}</span>, only the cap differs. Settled at block ${f.claim.settled_block}. <a class="txl" href="${esc(cfg.explorer.replace(/\/+$/, ''))}/address/${esc(cfg.contract_id)}" target="_blank" rel="noopener">Contract on explorer</a></p>`);
+  const ex = cfg.explorer.replace(/\/+$/, '');
+  put('#last', `<div class="lrow"><h2>Earlier split, settled</h2><p class="fcap">${esc(verdictLine(f))}</p></div>
+    <ul class="rail" aria-label="Where this result lives">
+      <li>fork #${f.id}</li><li>block ${f.claim.settled_block}</li><li>${esc(cfg.contract_id)}</li><li>${esc(f.signer.split('/').pop() ?? f.signer)}</li>
+      <li><a class="txl" href="${esc(ex)}/address/${esc(cfg.contract_id)}" target="_blank" rel="noopener">explorer</a></li>
+    </ul>`);
 }
 
 /** A settled, diverged, signed fork the chain is known to hold; the first screen falls back to it when the newest forks are stalled or unreadable. */
@@ -283,7 +285,7 @@ function renderProof() {
 }
 
 function renderNet() {
-  put('#net', `<span class="fdot ${ready ? 'on' : ''}"></span>${ready ? 'NEAR testnet, account ready' : relayDown ? 'NEAR testnet, relayer not answering' : onboardFailed ? 'NEAR testnet, account closed' : 'NEAR testnet, opening account'}`);
+  put('#net', `<span class="fdot ${ready ? 'on' : relayDown || onboardFailed ? 'bad' : 'wait'}"></span>${ready ? 'NEAR testnet, account ready' : relayDown ? 'NEAR testnet, relayer not answering' : onboardFailed ? 'NEAR testnet, account closed' : `NEAR testnet, opening account, try ${Math.max(1, onboardTry)} of 6`}`);
 }
 
 function render() {
@@ -365,7 +367,7 @@ async function pick(rule: Rule) {
       }
       if (id < 0) throw new Error('the split did not appear on chain in time');
       fork = await readFork(chain, id);
-      localStorage.setItem(FORK_SLOT, String(id));
+      sessionStorage.setItem(FORK_SLOT, String(id));
     }
   } catch (e) {
     if (!fork) backed = null;
@@ -462,16 +464,16 @@ async function tryEdit() {
 }
 
 function again() {
-  localStorage.removeItem(FORK_SLOT);
+  sessionStorage.removeItem(FORK_SLOT);
   fork = null; backed = null; startedAt = 0; replayAt = 0; settled = null; settling = false; notice = null; txs = []; doneAt = 0; heightNow = 0; expiryTx = '';
   render();
 }
 
 async function restore() {
-  const id = Number(localStorage.getItem(FORK_SLOT));
+  const id = Number(sessionStorage.getItem(FORK_SLOT));
   if (!id) return;
   const f = await readFork(chain, id).catch(() => null);
-  if (!f || f.creator !== chain.me.id) { localStorage.removeItem(FORK_SLOT); return; }
+  if (!f || f.creator !== chain.me.id) { sessionStorage.removeItem(FORK_SLOT); return; }
   fork = f; backed = f.backed_rule as Rule; startedAt = performance.now();
   if (f.status === 'open') void seal();
   else if (f.status === 'sealed') { sealedAt = Date.now(); void follow(); }

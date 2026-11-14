@@ -51,3 +51,10 @@ expiryTest('the answer window closes ANSWER_BLOCKS after the seal and never goes
   expiryExpect(blocksToExpiry(f, 1000 + ANSWER_BLOCKS)).toBe(0);
   expiryExpect(blocksToExpiry(f, 99999)).toBe(0);
 });
+
+test('the fork slot is per tab: no code path keeps it in localStorage, so a second tab cannot delete the first tab\'s fork', async () => {
+  const src = await Bun.file(new URL('../src/forked.ts', import.meta.url)).text();
+  const uses = src.split('\n').filter((l) => l.includes('FORK_SLOT') && !l.startsWith('const FORK_SLOT'));
+  expect(uses.length).toBeGreaterThanOrEqual(4);
+  for (const l of uses) expect(l).not.toContain('localStorage');
+});

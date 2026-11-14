@@ -57,6 +57,7 @@ function skeleton() {
   <div class="fork">
     <header class="ftop">
       <div class="flogo"><b>LONG CON</b><small>Forked Town</small></div>
+      <h1 class="fhero" id="fhero" hidden></h1>
       <p class="fdeck">Pick a rule. The contract splits the town in two and one signed answer runs through both.</p>
       <p class="net" id="net"></p>
     </header>
@@ -66,7 +67,7 @@ function skeleton() {
     <section class="fverdict panel" id="verdict" aria-live="polite" hidden></section>
     <section class="twins" id="twins" aria-label="The two towns"></section>
     <section class="fproof panel" id="proof" aria-label="Proof"></section>
-    <footer class="ffoot" id="ffoot"><p><b>No wallet, no popups:</b> the relayer pays gas for your session account.</p><p><b>One readable rules file:</b> every cap the contract enforces is in <a href="https://github.com/CryptoInnovators/near-longcon/blob/main/contract/src/rules.rs" target="_blank" rel="noopener">contract/src/rules.rs</a>. Hover a borrower to read the merchant's reasoning.</p><p><b>Items:</b> landed cons mint NEP-245 rumour tokens, see the <a href="/queue">queue game</a>.</p></footer>
+    <footer class="ffoot" id="ffoot"><p><b>No wallet, no popups:</b> the relayer pays gas for your session account.</p><p><b>One readable rules file:</b> every cap the contract enforces is in <a href="/rules.rs.txt" target="_blank" rel="noopener">contract/src/rules.rs</a>. Hover a borrower to read the merchant's reasoning.</p><p><b>Items:</b> landed cons mint NEP-245 rumour tokens, see the <a href="/queue">queue game</a>.</p></footer>
   </div>`;
 }
 
@@ -103,7 +104,7 @@ function renderControls() {
     ${picked ? `<ol class="steps" aria-label="Progress">${STEPS.map((t, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}">${esc(t)}</li>`).join('')}</ol>` : ''}
     ${sealing && readHealth(readFails) === 'failing' ? `<p class="retry">The chain read is failing (${esc(readErr || 'no answer')}). Your seal is on chain and nothing is lost. <button class="btn gold" type="button" data-act="recheck">Read again</button></p>` : ''}
     ${settleFailed && canSettleAgain(fork, replayDone(), settling) ? '<p class="retry">The claim did not settle yet. The divergence receipt is still valid. <button class="btn gold" type="button" data-act="settle">Settle again</button></p>' : ''}
-    ${gaveUp ? '<p class="retry">The merchant has not signed in 90 s. Your seal stays on chain and the answer settles it if it lands. <button class="btn gold" type="button" data-act="again">Split a new town</button></p>'
+    ${gaveUp ? '<p class="retry">NEAR AI Cloud has not returned the signed merchant answer in 90 s. Your seal stays on chain, the merchant worker keeps retrying it, and the claim settles the moment it lands. <button class="btn gold" type="button" data-act="recheck">Check again</button> <button class="btn" type="button" data-act="again">Split a new town</button></p>'
       : late ? '<p class="retry">The merchant is taking longer than usual. The seal is on chain, and the answer settles it the moment it lands. <button class="btn gold" type="button" data-act="recheck">Check again</button></p>' : ''}
     ${onboardFailed ? '<p class="retry"><button class="btn gold" type="button" data-act="retry">Retry</button></p>' : ''}
     <p class="status" role="status">${esc(status)}${sealing ? ` The merchant is deciding <span class="num">${Math.max(0, Math.round(waited / 1000))} s</span>` : ''}</p>`);
@@ -127,6 +128,20 @@ function chart(i: number, idx: number): string {
     ? `<line x1="${x(fd)}" x2="${x(fd)}" y1="2" y2="78" class="split"/><text x="${x(fd) + 4}" y="12" class="splitlabel">rules part here</text>` : '';
   const dots = rows.slice(0, idx + 1).map((r, d) => `<circle cx="${x(d).toFixed(1)}" cy="${y(r.gold).toFixed(1)}" r="${d === idx ? 4 : 2}" class="${d === idx ? 'now' : ''}"/>`).join('');
   return `<svg viewBox="0 0 300 80" class="chart" role="img" aria-label="Merchant gold by day, cap ${fork!.branches[i].rule}">${mark}<polyline points="${pts}"/>${dots}</svg>`;
+}
+
+/** Both towns' gold by day on one chart, so the two futures share a screen at any width. */
+function dualChart(f: Fork, idx: number): string {
+  const all = f.branches.flatMap((b) => b.rows.map((r) => r.gold));
+  const lo = Math.min(...all) - 4, hi = Math.max(...all) + 4;
+  const x = (d: number) => 10 + (d * 250) / 7;
+  const y = (g: number) => 10 + (1 - (g - lo) / Math.max(1, hi - lo)) * 90;
+  const lines = f.branches.map((b, i) => {
+    const pts = b.rows.slice(0, idx + 1).map((r, d) => `${x(d).toFixed(1)},${y(r.gold).toFixed(1)}`).join(' ');
+    const last = b.rows[Math.min(idx, b.rows.length - 1)];
+    return `<polyline class="l${i}" points="${pts}"/><circle class="l${i}" cx="${x(Math.min(idx, 7)).toFixed(1)}" cy="${y(last.gold).toFixed(1)}" r="4"/><text class="t${i}" x="${(x(Math.min(idx, 7)) + 8).toFixed(1)}" y="${(y(last.gold) + 4).toFixed(1)}">cap ${b.rule} ${last.gold}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 340 110" class="dual" role="img" aria-label="Merchant gold by day: cap ${f.branches[0].rule} against cap ${f.branches[1].rule}">${lines}</svg>`;
 }
 
 function renderTwins() {
@@ -178,20 +193,30 @@ function renderLast() {
   const show = !!f && !fork && !busy.startsWith('split');
   const el = document.querySelector('#last') as HTMLElement;
   el.hidden = !show;
+  const hero = document.querySelector('#fhero') as HTMLElement;
+  hero.hidden = !show;
   if (!show || !f) return;
+  hero.textContent = verdictLine(f);
   put('#last', `<h2><span class="ico s lock"></span>An earlier split, settled on chain</h2>
     ${deltaHtml(f)}
     <p class="fk">Fork #${f.id} on ${esc(cfg.contract_id)}. Press a cap to run your own. Same four pitches, one signed answer from <span class="mono">${esc(f.signer)}</span>, only the cap differs. Settled at block ${f.claim.settled_block}. <a class="txl" href="${esc(cfg.explorer.replace(/\/+$/, ''))}/address/${esc(cfg.contract_id)}" target="_blank" rel="noopener">Contract on explorer</a></p>`);
 }
 
+/** A settled, diverged, signed fork the chain is known to hold; the first screen falls back to it when the newest forks are stalled or unreadable. */
+const PINNED_FORK = 57;
+const SCAN_FORKS = 40;
+const usable = (f: Fork | null | undefined): f is Fork => !!f && f.status === 'settled' && !!f.divergence?.diverged && !!f.signer;
+
 async function loadLast() {
   try {
     const n = Number(await chain.view<number>('fork_count'));
-    for (let id = n; id >= Math.max(0, n - 11); id--) {
-      const f = await readFork(chain, id);
-      if (f && f.status === 'settled' && f.divergence?.diverged && f.signer) { lastFork = f; break; }
-    }
-  } catch { /* the strip stays hidden when the chain read fails */ }
+    const ids = Array.from({ length: Math.min(SCAN_FORKS, n) }, (_, k) => n - k);
+    const forks = await Promise.all(ids.map((id) => readFork(chain, id).catch(() => null)));
+    lastFork = forks.find(usable) ?? null;
+  } catch { /* the pinned fork below still answers */ }
+  if (!lastFork) {
+    try { const f = await readFork(chain, PINNED_FORK); if (usable(f)) lastFork = f; } catch { /* the strip stays hidden when the chain read fails */ }
+  }
   renderLast();
 }
 
@@ -200,6 +225,7 @@ function renderVerdict() {
   if (notice) body += `<p class="fnote ${notice.kind}" role="alert">${esc(notice.text)}${notice.tx ? ` ${tx(notice.tx, 'transaction')}` : ''}</p>`;
   if (fork && replayDone()) {
     const c = fork.claim;
+    body += `<div class="fdual">${dualChart(fork, 7)}</div>`;
     const line = c.status === 'won' ? `You backed the cap of ${fork.backed_rule}. It kept more gold, so the claim wins ${c.payout} gold.`
       : c.status === 'lost' ? `You backed the cap of ${fork.backed_rule}. The other rule kept more gold, so the claim loses.`
       : c.status === 'draw' ? `You backed the cap of ${fork.backed_rule}. Both towns end level, so the claim draws.`
@@ -211,7 +237,7 @@ function renderVerdict() {
     body += `<h2>${esc(verdictLine(fork))}</h2><p class="claim ${c.status}">${esc(line)}${settled ? ` ${tx(settled.tx, 'settlement')}` : ''}</p>
       <p class="fclock">Rule pick to settled claim: <b class="num">${doneAt || elapsed()} s</b> <button class="btn small" type="button" data-act="again">Split another town</button></p>`;
   } else if (fork && fork.status !== 'open' && fork.status !== 'sealed') {
-    body += `<h2>Seven days pass in the two towns.</h2><p class="claim">Day ${Math.max(0, dayIdx())} of 7. The proof below is already final.</p>`;
+    body += `<h2>Seven days pass in the two towns.</h2><div class="fdual">${dualChart(fork, Math.max(0, dayIdx()))}</div><p class="claim">Day ${Math.max(0, dayIdx())} of 7. The proof below is already final.</p>`;
   }
   put("#verdict", body);
   (document.querySelector("#verdict") as HTMLElement).hidden = !body;

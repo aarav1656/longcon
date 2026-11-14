@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
-    "build": "tsc --noEmit && vite build",
+    "build": "cp ../contract/src/rules.rs public/rules.rs.txt && tsc --noEmit && vite build",
     "test": "find . -name '._*' -not -path './node_modules/*' -delete; bun test ./test"
   },
   "dependencies": {

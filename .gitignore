@@ -17,3 +17,4 @@ docs/*.rows
 docs/REPORT.md
 docs/HACKATHON.md
 docs/WIN-CONDITIONS.md
+web/public/rules.rs.txt

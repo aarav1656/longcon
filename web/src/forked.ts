@@ -190,7 +190,8 @@ function deltaHtml(f: Fork): string {
 
 function renderLast() {
   const f = lastFork;
-  const show = !!f && !fork && !busy.startsWith('split');
+  const running = !!fork && (fork.status === 'open' || fork.status === 'sealed');
+  const show = !!f && (!fork || running);
   const el = document.querySelector('#last') as HTMLElement;
   el.hidden = !show;
   const hero = document.querySelector('#fhero') as HTMLElement;
@@ -199,7 +200,7 @@ function renderLast() {
   hero.textContent = verdictLine(f);
   put('#last', `<h2><span class="ico s lock"></span>An earlier split, settled on chain</h2>
     ${deltaHtml(f)}
-    <p class="fk">Fork #${f.id} on ${esc(cfg.contract_id)}. Press a cap to run your own. Same four pitches, one signed answer from <span class="mono">${esc(f.signer)}</span>, only the cap differs. Settled at block ${f.claim.settled_block}. <a class="txl" href="${esc(cfg.explorer.replace(/\/+$/, ''))}/address/${esc(cfg.contract_id)}" target="_blank" rel="noopener">Contract on explorer</a></p>`);
+    <p class="fk">Fork #${f.id} on ${esc(cfg.contract_id)}. ${running || busy.startsWith('split') ? 'Your own split is running below.' : 'Press a cap to run your own.'} Same four pitches, one signed answer from <span class="mono">${esc(f.signer)}</span>, only the cap differs. Settled at block ${f.claim.settled_block}. <a class="txl" href="${esc(cfg.explorer.replace(/\/+$/, ''))}/address/${esc(cfg.contract_id)}" target="_blank" rel="noopener">Contract on explorer</a></p>`);
 }
 
 /** A settled, diverged, signed fork the chain is known to hold; the first screen falls back to it when the newest forks are stalled or unreadable. */
@@ -208,14 +209,22 @@ const SCAN_FORKS = 40;
 const usable = (f: Fork | null | undefined): f is Fork => !!f && f.status === 'settled' && !!f.divergence?.diverged && !!f.signer;
 
 async function loadLast() {
+  const pinned = readFork(chain, PINNED_FORK).catch(() => null);
   try {
     const n = Number(await chain.view<number>('fork_count'));
-    const ids = Array.from({ length: Math.min(SCAN_FORKS, n) }, (_, k) => n - k);
-    const forks = await Promise.all(ids.map((id) => readFork(chain, id).catch(() => null)));
-    lastFork = forks.find(usable) ?? null;
+    for (let hi = n; hi > 0 && hi > n - SCAN_FORKS; hi -= 4) {
+      const ids = [hi, hi - 1, hi - 2, hi - 3].filter((id) => id > 0);
+      const found = (await Promise.all(ids.map((id) => readFork(chain, id).catch(() => null)))).find(usable);
+      if (found) { lastFork = found; break; }
+      if (!lastFork) {
+        const f = await pinned;
+        if (usable(f)) { lastFork = f; renderLast(); }
+      }
+    }
   } catch { /* the pinned fork below still answers */ }
   if (!lastFork) {
-    try { const f = await readFork(chain, PINNED_FORK); if (usable(f)) lastFork = f; } catch { /* the strip stays hidden when the chain read fails */ }
+    const f = await pinned;
+    if (usable(f)) lastFork = f;
   }
   renderLast();
 }

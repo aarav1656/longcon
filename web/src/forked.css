@@ -209,4 +209,4 @@
 .dual text { font: 600 12px var(--font); }
 .dual text.t0 { fill: var(--gold); }
 .dual text.t1 { fill: var(--green-2); }
-@media (max-width: 900px) { .fhero { grid-row: auto; order: -1; } }
+@media (max-width: 900px) { .fhero { grid-row: auto; order: 1; } .ftop .fdeck { order: 2; } .ftop .net { order: 3; } }

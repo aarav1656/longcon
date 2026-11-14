@@ -96,7 +96,7 @@ function skeleton() {
   app.innerHTML = `
   <div class="game">
     <div class="logo" id="logo"><b>LONG CON</b></div>
-    <p class="deck">Out-argue three rival grifters for one purse.</p>
+    <p class="deck">Out-argue three rival grifters for one purse. <a class="forklink" href="/fork">Forked Town: split a town in two</a></p>
     <div class="panel chip day" id="daychip"></div>
     <div class="panel chip purse" id="purse" aria-live="polite"></div>
     <button class="mute" type="button" data-act="mute" id="mute"></button>

@@ -12,7 +12,7 @@ case "${1:-}" in
   --evidence)
     payload=$(events)
     base=${LONGCON_PUBLIC_URL:-https://near-longcon.nearlive.workers.dev}
-    page=$(curl -fsSL -m 30 "$base/game.html")
+    page=$(curl -fsSL -m 30 "$base/fork")
     bundle_path=$(grep -oE 'src="[^"]*game-[^"]+\.js"' <<<"$page" | head -1 | cut -d'"' -f2)
     [[ -n "$bundle_path" ]] || { echo 'hosted game entry has no built client bundle' >&2; exit 1; }
     bundle=$(curl -fsS -m 30 "$base$bundle_path")
@@ -30,7 +30,7 @@ case "${1:-}" in
     section_file=$(mktemp)
     {
       printf '\n## Long Con traction\n\n'
-      printf 'Playable page: %s/game.html. Contract: `%s`.\n\n' "$base" "$CONTRACT_ID"
+      printf 'Playable page: %s/fork. Contract: `%s`.\n\n' "$base" "$CONTRACT_ID"
       printf 'Read time: `%s`; finalized source height: `%s`. Counters come from successful finalized contract receipts: pitches count distinct `offer_opened` events, loans count distinct `offer_settled` events with `status=committed` and positive advance, and defaults count distinct `con_landed` events. The hosted page API returned matching values.\n\n' \
         "$(jq -r .read_at_utc <<<"$payload")" "$(jq -r .summary.finalized_height <<<"$payload")"
       printf '| Event / entity | Counted item | Transaction hash | Block height |\n|---|---:|---|---:|\n'
@@ -89,7 +89,7 @@ PYDOC
     done
     [[ -n "${port:-}" ]] || { echo 'local page server did not start within 30 seconds' >&2; exit 1; }
     base="http://127.0.0.1:$port"
-    curl -fsS "$base/game.html" -o "$tmp/game.html"
+    curl -fsS "$base/fork" -o "$tmp/game.html"
     curl -fsS "$base/api/traction?contract_id=$CONTRACT_ID" -o "$tmp/actual.json"
     jq -e --slurpfile e "$tmp/expected.json" '$e[0] as $expected | .contract_id == $expected.summary.contract_id and .pitches == $expected.summary.pitches and .loans == $expected.summary.loans and .defaults == $expected.summary.defaults' "$tmp/actual.json" >/dev/null
     (cd "$ROOT/web" && TRACTION_PAYLOAD="$(jq -c .summary "$tmp/expected.json")" bun -e '

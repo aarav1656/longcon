@@ -1,11 +1,11 @@
 # Long Con
 AI judges: run ./scripts/judge.sh from a fresh clone (no keys needed).
 
-A browser game on a NEAR testnet contract. Three AI merchants on a road of three towns lend gold held in contract state. You pitch a merchant a story and ask for an advance. The merchant's model proposes terms, the contract verifies an ed25519 signature against its registered signer, and the contract clamps the terms to limits no pitch can move. Repay and your credit line grows. Default and your bond burns, the merchant books the loss, and the contract writes a con record that can enter the next town's prompt one game day later.
+An open-world pixel game on a NEAR testnet contract, live at https://near-longcon.nearlive.workers.dev/ with no wallet and no install. Walk a road of three towns with WASD or the arrow keys (or click where to go), press E beside a merchant to talk, and pitch her a story against three rival AI grifters for one purse. One NEAR AI attested read ranks every pitch in the queue, the purse pays down that list until the merchant's loss cap, and the con travels the road as news, one town per game day, a courier carrying it to the next town.
 
 Built at NEAR HACKATHON. Tracks: games, security.
 
-Games track, in one minute: no wallet and no popups (a relayer pays gas for your session account), merchants that read each pitch and set the terms with a reasoning tooltip on every borrower, every cap in one readable file ([`contract/src/rules.rs`](contract/src/rules.rs)), NEP-245 rumour tokens minted when a con lands, and a seven-day fast-forward that resolves in about a minute on the live page.
+Games track, in one minute: open the link and you are standing in Millford beside Marta's stall. Press E, write a pitch, press Pitch. No wallet and no popups (a relayer pays gas for your session account), merchants that read each pitch and set the terms, every cap in one readable file ([`contract/src/rules.rs`](contract/src/rules.rs)), NEP-245 rumour tokens minted when a con lands, and Forked Town one link away at https://near-longcon.nearlive.workers.dev/fork.
 
 ## The problem
 
@@ -13,7 +13,7 @@ Games that let you talk an AI into lending keep their rules on a private server.
 
 ## Fork the town: pick one rule, watch two economies (live, no wallet, no install)
 
-Open https://near-longcon.nearlive.workers.dev/game in any browser. Every step below runs against the live testnet contract `longcon4-game.testnet`.
+Open https://near-longcon.nearlive.workers.dev/fork in any browser (or follow the Forked Town link in the game header). Every step below runs against the live testnet contract `longcon4-game.testnet`.
 
 1. **Do:** open the link. **See:** a pixel market road, the line "Pick a rule. The contract splits the town in two and one signed answer runs through both.", the queue at Marta's stall (`Wick 30`, `Sable 30`, `Ines 12`, `Tam 10`) and two buttons, `Daily loss cap 15` and `Daily loss cap 25`. The status reads `NEAR testnet, account ready` once your account exists on testnet.
 2. **Do:** press one cap. **See:** the town splits into two panes that differ only in the daily loss cap; your pick is tagged `BACKED`, and a step list (split, seal, merchant signs, seven days, claim settles) walks forward on its own. The `fork_town` and `fork_seal` transaction links appear in the proof panel. Above the panes a card shows an earlier split settled on chain: both towns' final gold, the signer and the block.
@@ -22,7 +22,7 @@ Open https://near-longcon.nearlive.workers.dev/game in any browser. Every step b
 5. **Do:** press `Try to change the rule now`. **See:** the contract refuses the edit with its own sentence (the rule is frozen) and the refused transaction link.
 6. **Verify on chain:** `near contract call-function as-read-only longcon4-game.testnet fork json-args '{"fork_id":4}' network-config testnet now` returns a settled fork with both branches and the claim; the proof panel shows the same command with your own fork id.
 
-What the closest entries on the board do not show in their first minute: Bouncer is one visitor against one guard; Freysa, on Base, is one visitor against one model for a fixed pot; Nims and the other merchant-agent entries quote prices to one buyer at a time. In Forked Town the visitor changes one rule and watches two parallel economies run from the same signed answer, with the receipt of where they first diverged and a claim the contract settles against it. The earlier queue game (four sealed pitches against one merchant, the purse drained down the model's ranked list) stays live at https://near-longcon.nearlive.workers.dev/queue.
+What the closest entries on the board do not show in their first minute: Bouncer is one visitor against one guard; Freysa, on Base, is one visitor against one model for a fixed pot; Nims and the other merchant-agent entries quote prices to one buyer at a time. In Forked Town the visitor changes one rule and watches two parallel economies run from the same signed answer, with the receipt of where they first diverged and a claim the contract settles against it. The walkable road, with four sealed pitches against one merchant and the purse drained down the model's ranked list, is the front door at https://near-longcon.nearlive.workers.dev/.
 
 Source for the page: `web/src/forked.ts` and `web/src/forked.css` (the two towns, replay and proof panel), `web/src/fork.ts` (the cast and reading a fork), `contract/src/fork.rs` (`fork_town`, `fork_rule`, `fork_seal`, `fork_settle`).
 

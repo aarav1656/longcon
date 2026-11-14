@@ -1,6 +1,6 @@
 # Long Con
 
-Long Con: Forked Town. Pick one town rule and the contract splits the town in two, runs one signed AI answer through both, and shows which economy survives.
+Long Con is an open-world pixel game on NEAR. Walk into a town, press E beside a merchant, and out-argue three rival AI grifters for one purse. One NEAR AI attested read ranks every pitch, the purse pays down the ranking until the merchant's loss cap, and the con travels the road to the next town as news. Forked Town, one link away, lets a visitor change one rule and watch two towns run from the same signed answer.
 
 ## Who uses it
 
@@ -26,7 +26,7 @@ The visitor picks a daily loss cap (15 or 25). The contract clones the town into
 
 ## Try it in 60 seconds
 
-Open [Forked Town](https://near-longcon.nearlive.workers.dev/game) and press `Daily loss cap 15` or `Daily loss cap 25`. One press splits the town, seals the queue and replays seven days in both towns, the banner names the winning cap, and the proof panel shows the hashes, the signer and the `fork_settle` transaction.
+Open the [road](https://near-longcon.nearlive.workers.dev/), press `E` beside Marta and send a pitch, then watch the attested ranking pay the purse and the con ride to the next town. For the second game, open [Forked Town](https://near-longcon.nearlive.workers.dev/fork) and press `Daily loss cap 15` or `Daily loss cap 25`. One press splits the town, seals the queue and replays seven days in both towns, the banner names the winning cap, and the proof panel shows the hashes, the signer and the `fork_settle` transaction.
 
 ## Why NEAR
 

@@ -21,10 +21,10 @@ export interface Branch { rule: number; start_hash: string; loans: Loan[]; rows:
 export interface Divergence { diverged: boolean; first_day: number; hash_a: string; hash_b: string; block: number; receipt: string }
 export interface Fork {
   id: number; creator: string; merchant: number; merchant_name: string; town: number; day: number; backed_rule: number;
-  status: 'open' | 'sealed' | 'resolved' | 'settled'; world_hash: string; seed: string; purse: number;
+  status: 'open' | 'sealed' | 'resolved' | 'settled' | 'expired'; world_hash: string; seed: string; purse: number;
   cast: CastMember[]; request_hash: string; response_hash: string; signer: string;
   split_block: number; sealed_block: number; resolved_block: number;
-  branches: Branch[]; divergence: Divergence | null; claim: { status: 'open' | 'won' | 'lost' | 'draw'; payout: number; settled_block: number };
+  branches: Branch[]; divergence: Divergence | null; claim: { status: 'open' | 'won' | 'lost' | 'draw' | 'void'; payout: number; settled_block: number };
 }
 
 export const readFork = (chain: Chain, id: number) => chain.view<Fork | null>('fork', { fork_id: id });
@@ -63,6 +63,15 @@ export const LATE_MS = 35_000;
 export const GIVEUP_MS = 90_000;
 /** How the page treats a sealed fork the merchant has not answered: keep waiting, offer a re-read, or offer a fresh split. */
 export const waitState = (waitedMs: number): 'wait' | 'late' | 'gaveup' => (waitedMs > GIVEUP_MS ? 'gaveup' : waitedMs > LATE_MS ? 'late' : 'wait');
+
+/** Blocks the contract gives a sealed fork to receive its signed answer (FORK_ANSWER_BLOCKS in contract/src/fork.rs). */
+export const ANSWER_BLOCKS = 200;
+/** Block at which anyone may close an unanswered sealed fork. */
+export const expiryBlock = (f: Pick<Fork, 'sealed_block'>): number => f.sealed_block + ANSWER_BLOCKS;
+/** Blocks left in the answer window at `height`; 0 means the contract accepts `fork_expire`. */
+export const blocksToExpiry = (f: Pick<Fork, 'sealed_block'>, height: number): number => Math.max(0, expiryBlock(f) - height);
+/** Seconds a block count lasts on testnet, rounded up, for the countdown line. */
+export const blocksToSeconds = (blocks: number): number => Math.ceil(blocks * 1.1);
 
 export const READ_FAIL_LIMIT = 3;
 /** A run of failed chain reads stays quiet for two tries, then the page says so and offers a re-read. */

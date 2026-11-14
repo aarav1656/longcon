@@ -28,6 +28,9 @@ pub const FORK_MAX_PER_ACCOUNT: u32 = 3;
 pub const FORK_PAYOUT: u64 = 4;
 /// Fork requests carry a batch number above any ledger batch, so a signed answer for one never fits the other.
 pub const FORK_BATCH_BASE: u64 = 1 << 48;
+/// Blocks a sealed fork waits for the merchant's signed answer. When the window closes the contract itself
+/// closes the fork (`fork_expire`), so a stalled model, worker or relayer can never leave a town sealed forever.
+pub const FORK_ANSWER_BLOCKS: u64 = 200;
 
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -37,6 +40,7 @@ pub enum ForkStatus {
     Sealed,
     Resolved,
     Settled,
+    Expired,
 }
 
 #[near(serializers = [json, borsh])]
@@ -47,6 +51,7 @@ pub enum ClaimStatus {
     Won,
     Lost,
     Draw,
+    Void,
 }
 
 #[near(serializers = [json, borsh])]
@@ -370,6 +375,23 @@ fn divergence_of(f: &Fork, a: &Branch, b: &Branch, block: u64) -> Divergence {
     Divergence { diverged: first.is_some(), first_day: day, hash_a: ha, hash_b: hb, block, receipt }
 }
 
+/// The block at which a fork sealed at `sealed_block` may be closed without an answer.
+pub fn answer_deadline(sealed_block: u64) -> u64 {
+    sealed_block.saturating_add(FORK_ANSWER_BLOCKS)
+}
+
+/// Why a fork cannot be expired at `now`, or `None` when it can.
+pub fn expiry_refusal(status: ForkStatus, sealed_block: u64, now: u64) -> Option<String> {
+    if status != ForkStatus::Sealed {
+        return Some("only a sealed fork that is waiting for the merchant's answer can expire".to_string());
+    }
+    let due = answer_deadline(sealed_block);
+    if now < due {
+        return Some(format!("the merchant still has time to answer: the window closes at block {due}, {} blocks from now", due - now));
+    }
+    None
+}
+
 impl Contract {
     fn fork_relayer_only(&self) {
         let caller = env::predecessor_account_id();
@@ -552,6 +574,29 @@ impl Contract {
         write(KEY_OPEN, &open);
     }
 
+    /// Close a sealed fork whose signed answer did not arrive inside `FORK_ANSWER_BLOCKS`. Anyone may call it.
+    /// The claim is void, the town allowance it used is returned to its creator, and a late answer is refused.
+    pub fn fork_expire(&mut self, fork_id: u64) {
+        let mut f = load(fork_id);
+        let now = env::block_height();
+        if let Some(why) = expiry_refusal(f.status, f.sealed_block, now) {
+            env::panic_str(&why);
+        }
+        f.status = ForkStatus::Expired;
+        f.resolved_block = now;
+        f.request_body = String::new();
+        f.claim = ForkClaim { status: ClaimStatus::Void, payout: 0, settled_block: now };
+        write(&key_fork(fork_id), &f);
+        let mut open: Vec<u64> = read(KEY_OPEN).unwrap_or_default();
+        open.retain(|x| *x != fork_id);
+        write(KEY_OPEN, &open);
+        let ids_key = key_ids(&f.creator);
+        let mut mine: Vec<u64> = read(&ids_key).unwrap_or_default();
+        mine.retain(|x| *x != fork_id);
+        write(&ids_key, &mine);
+        emit("fork_expired", json!({"fork_id": fork_id, "creator": f.creator, "sealed_block": f.sealed_block, "deadline_block": answer_deadline(f.sealed_block), "block": now, "refunded_allowance": 1}));
+    }
+
     /// Settle the creator's claim from the recorded divergence. `receipt` must equal the receipt the
     /// contract wrote at resolution; a made-up one, or a second settlement, fails.
     pub fn fork_settle(&mut self, fork_id: u64, receipt: String) -> ClaimStatus {
@@ -650,6 +695,16 @@ mod tests {
         };
         f.world_hash = world_hash(&f);
         f
+    }
+
+    #[test]
+    fn a_sealed_fork_expires_only_after_its_window() {
+        assert!(expiry_refusal(ForkStatus::Sealed, 1000, 1000 + FORK_ANSWER_BLOCKS - 1).unwrap().contains("still has time"));
+        assert!(expiry_refusal(ForkStatus::Sealed, 1000, 1000 + FORK_ANSWER_BLOCKS).is_none());
+        assert!(expiry_refusal(ForkStatus::Open, 0, u64::MAX).is_some());
+        assert!(expiry_refusal(ForkStatus::Resolved, 1000, u64::MAX).is_some());
+        assert!(expiry_refusal(ForkStatus::Settled, 1000, u64::MAX).is_some());
+        assert!(expiry_refusal(ForkStatus::Expired, 1000, u64::MAX).is_some());
     }
 
     #[test]

@@ -1,7 +1,7 @@
 import './style.css';
 import './forked.css';
 import { Chain, ChainError, identity, loadConfig, type Config } from './chain.ts';
-import { CAST, RULES, canSettleAgain, dayFeed, readFork, readHealth, richer, verdictLine, waitState, type Branch, type Fork, type Rule } from './fork.ts';
+import { CAST, RULES, blocksToExpiry, blocksToSeconds, canSettleAgain, expiryBlock, dayFeed, readFork, readHealth, richer, verdictLine, waitState, type Branch, type Fork, type Rule } from './fork.ts';
 import { clampSentence, esc, shortId, txUrl } from './words.ts';
 
 const FORK_SLOT = 'longcon.fork';
@@ -33,6 +33,10 @@ let lastFork: Fork | null = null;
 let merchantName = "the merchant";
 let openPurse: number | null = null;
 let doneAt = 0;
+let heightNow = 0;
+let heightAt = 0;
+let expiring = false;
+let expiryTx = '';
 
 const nap = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const html = new WeakMap<Element, string>();
@@ -47,7 +51,7 @@ let startedAt = 0;
 const elapsed = () => (startedAt ? Math.round((performance.now() - startedAt) / 1000) : 0);
 
 function dayIdx(): number {
-  if (!fork || fork.status === 'open' || fork.status === 'sealed' || !replayAt) return -1;
+  if (!fork || fork.status === 'open' || fork.status === 'sealed' || fork.status === 'expired' || !replayAt) return -1;
   return Math.min(7, Math.floor((Date.now() - replayAt) / DAY_MS));
 }
 const replayDone = () => dayIdx() === 7;
@@ -80,9 +84,16 @@ const STEPS = ['Split the town', 'Seal the queue', 'Merchant signs', 'Seven days
 function stage(): number {
   if (!fork) return busy.startsWith('split') ? 0 : -1;
   if (fork.status === 'open') return 1;
-  if (fork.status === 'sealed') return 2;
+  if (fork.status === 'sealed' || fork.status === 'expired') return 2;
   if (fork.status === 'settled' && replayDone()) return 5;
   return replayDone() ? 4 : 3;
+}
+
+const estHeight = () => (heightNow ? heightNow + (Date.now() - heightAt) / 1100 : 0);
+function deadlineLeft(): string {
+  if (!fork || !heightNow) return '';
+  const left = blocksToExpiry(fork, estHeight());
+  return left > 0 ? `, about ${blocksToSeconds(left)} s from now` : ', now';
 }
 
 function renderControls() {
@@ -104,9 +115,10 @@ function renderControls() {
     ${picked ? `<ol class="steps" aria-label="Progress">${STEPS.map((t, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}">${esc(t)}</li>`).join('')}</ol>` : ''}
     ${sealing && readHealth(readFails) === 'failing' ? `<p class="retry">The chain read is failing (${esc(readErr || 'no answer')}). Your seal is on chain and nothing is lost. <button class="btn gold" type="button" data-act="recheck">Read again</button></p>` : ''}
     ${settleFailed && canSettleAgain(fork, replayDone(), settling) ? '<p class="retry">The claim did not settle yet. The divergence receipt is still valid. <button class="btn gold" type="button" data-act="settle">Settle again</button></p>' : ''}
-    ${gaveUp ? '<p class="retry">NEAR AI Cloud has not returned the signed merchant answer in 90 s. Your seal stays on chain, the merchant worker keeps retrying it, and the claim settles the moment it lands. <button class="btn gold" type="button" data-act="recheck">Check again</button> <button class="btn" type="button" data-act="again">Split a new town</button></p>'
+    ${gaveUp ? `<p class="retry">NEAR AI Cloud has not returned the signed merchant answer in 90 s. Your seal stays on chain and the merchant worker keeps retrying it. If it has not landed by block ${expiryBlock(fork!)} the contract closes the fork itself. <button class="btn gold" type="button" data-act="recheck">Check again</button> <button class="btn" type="button" data-act="again">Split a new town</button></p>`
       : late ? '<p class="retry">The merchant is taking longer than usual. The seal is on chain, and the answer settles it the moment it lands. <button class="btn gold" type="button" data-act="recheck">Check again</button></p>' : ''}
     ${onboardFailed ? '<p class="retry"><button class="btn gold" type="button" data-act="retry">Retry</button></p>' : ''}
+    ${sealing ? `<p class="fk deadline">The contract closes this fork and returns your town if no signed answer lands by block <span class="num">${expiryBlock(fork!)}</span><span class="dl">${deadlineLeft()}</span></p>` : ''}
     <p class="status" role="status">${esc(status)}${sealing ? ` The merchant is deciding <span class="num">${Math.max(0, Math.round(waited / 1000))} s</span>` : ''}</p>`);
 }
 
@@ -133,7 +145,7 @@ function chart(i: number, idx: number): string {
 function renderTwins() {
   const idx = dayIdx();
   const panes = RULES.map((rule, i) => {
-    const b = fork && fork.status !== 'open' && fork.status !== 'sealed' ? fork.branches[i] : null;
+    const b = fork && fork.status !== 'open' && fork.status !== 'sealed' && fork.status !== 'expired' ? fork.branches[i] : null;
     const row = b && idx >= 0 ? b.rows[idx] : null;
     const gold = row ? row.gold : fork ? fork.purse : openPurse;
     const lost = b && idx > 0 ? stampFor(b, idx) : 0;
@@ -176,7 +188,7 @@ function deltaHtml(f: Fork): string {
 
 function renderLast() {
   const f = lastFork;
-  const running = !!fork && (fork.status === 'open' || fork.status === 'sealed');
+  const running = !!fork && (fork.status === 'open' || fork.status === 'sealed' || fork.status === 'expired');
   const show = !!f && (!fork || running);
   const el = document.querySelector('#last') as HTMLElement;
   el.hidden = !show;
@@ -230,6 +242,9 @@ function renderVerdict() {
     body += `<div class="fsigned"><p class="fk">One signed answer, applied to both towns <span class="mono">${esc(fork.signer || '')}, NEAR AI attested, response ${esc(shortId(fork.response_hash, 8, 6))}</span></p><ul>${said}</ul></div>`;
     body += `<h2>${esc(verdictLine(fork))}</h2><p class="claim ${c.status}">${esc(line)}${settled ? ` ${tx(settled.tx, 'settlement')}` : ''}</p>
       <p class="fclock">Rule pick to settled claim: <b class="num">${doneAt || elapsed()} s</b> <button class="btn small" type="button" data-act="again">Split another town</button></p>`;
+  } else if (fork?.status === 'expired') {
+    body += `<h2>The contract closed this fork unanswered.</h2><p class="claim void">No signed merchant answer reached the contract by block ${expiryBlock(fork)}. It closed the fork at block ${fork.claim.settled_block}, voided the claim and returned your town allowance.${expiryTx ? ` ${tx(expiryTx, 'expiry')}` : ''}</p>
+      <p class="fclock"><button class="btn gold" type="button" data-act="again">Split a new town</button></p>`;
   } else if (fork && fork.status !== 'open' && fork.status !== 'sealed') {
     body += `<h2>Seven days pass in the two towns.</h2><p class="claim">Day ${Math.max(0, dayIdx())} of 7. The proof below is already final.</p>`;
   }
@@ -249,6 +264,7 @@ function renderProof() {
     ['Signer', fork.signer ? `${fork.signer}, NEAR AI attested` : ''],
     ['Divergence receipt', fork.divergence?.receipt ?? ''],
     ['Day 7 hash, cap 15 | cap 25', fork.divergence ? `${shortId(fork.divergence.hash_a, 10, 8)} | ${shortId(fork.divergence.hash_b, 10, 8)}` : ''],
+    ['Answer deadline', fork.status === 'sealed' || fork.status === 'expired' ? `block ${expiryBlock(fork)}` : ''],
     ['Blocks', `split ${fork.split_block}, sealed ${fork.sealed_block}${fork.resolved_block ? `, resolved ${fork.resolved_block}` : ''}${fork.claim.settled_block ? `, settled ${fork.claim.settled_block}` : ''}`],
   ] as [string, string][]).filter(([, v]) => v);
   const waiting = fork.status === 'sealed' ? '<p class="claim">Waiting for the merchant to sign its answer. The signer, response hash and divergence receipt land here the moment it arrives.</p>' : '';
@@ -370,13 +386,34 @@ async function recheck() {
   renderControls();
 }
 
+/** Ask the contract to close a sealed fork whose answer window has run out. A late answer that lands first wins and the read below shows it. */
+async function expire() {
+  if (!fork || expiring || fork.status !== 'sealed') return;
+  expiring = true;
+  try {
+    const done = await call('expiry', 'fork_expire', { fork_id: fork.id });
+    if (done.tx) expiryTx = done.tx;
+  } catch (e) {
+    if (e instanceof ChainError && e.tx) txs.push({ label: 'refused expiry', hash: e.tx });
+    await nap(4000);
+  }
+  try { fork = (await readFork(chain, fork.id)) ?? fork; } catch { /* the loop reads again */ }
+  expiring = false;
+}
+
 async function follow() {
+  let tick = 0;
   while (fork && fork.status === 'sealed') {
     await nap(1200);
-    try { fork = (await readFork(chain, fork.id)) ?? fork; readFails = 0; readErr = ''; }
-    catch (e) { readFails += 1; readErr = (e as Error).message.slice(0, 80); }
-    renderControls();
+    try {
+      fork = (await readFork(chain, fork.id)) ?? fork;
+      if (fork.status === 'sealed' && (tick++ % 5 === 0 || blocksToExpiry(fork, estHeight()) === 0)) { heightNow = await chain.height(); heightAt = Date.now(); }
+      readFails = 0; readErr = '';
+    } catch (e) { readFails += 1; readErr = (e as Error).message.slice(0, 80); }
+    if (fork.status === 'sealed' && heightNow && blocksToExpiry(fork, heightNow) === 0) await expire();
+    if (fork.status === 'sealed') renderControls();
   }
+  if (fork && fork.status === 'expired') { render(); return; }
   if (fork && fork.status !== 'open' && !replayAt) { replayAt = Date.now(); render(); void settle(); }
 }
 
@@ -413,7 +450,7 @@ async function tryEdit() {
 
 function again() {
   localStorage.removeItem(FORK_SLOT);
-  fork = null; backed = null; startedAt = 0; replayAt = 0; settled = null; settling = false; notice = null; txs = []; doneAt = 0;
+  fork = null; backed = null; startedAt = 0; replayAt = 0; settled = null; settling = false; notice = null; txs = []; doneAt = 0; heightNow = 0; expiryTx = '';
   render();
 }
 
@@ -425,6 +462,7 @@ async function restore() {
   fork = f; backed = f.backed_rule as Rule; startedAt = performance.now();
   if (f.status === 'open') void seal();
   else if (f.status === 'sealed') { sealedAt = Date.now(); void follow(); }
+  else if (f.status === 'expired') render();
   else { replayAt = Date.now(); void settle(); }
 }
 
@@ -453,6 +491,8 @@ async function boot() {
       renderTwins(); renderVerdict(); renderControls();
     }
     if (fork?.status === 'sealed') {
+      const dl = document.querySelector('#controls .dl');
+      if (dl) dl.textContent = deadlineLeft();
       const n = document.querySelector('#controls .status .num');
       if (n) n.textContent = `${Math.max(0, Math.round((Date.now() - sealedAt) / 1000))} s`;
       const ws = waitState(Date.now() - sealedAt);

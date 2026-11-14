@@ -43,6 +43,7 @@ export const GAS: Record<string, bigint> = {
   fork_town: 100_000_000_000_000n,
   fork_rule: 60_000_000_000_000n,
   fork_seal: 100_000_000_000_000n,
+  fork_expire: 100_000_000_000_000n,
   fork_settle: 100_000_000_000_000n,
 };
 
@@ -61,6 +62,12 @@ export class Chain {
     // The primary testnet endpoint can rate-limit reads or reject browser CORS requests.
     const alt = cfg.network === 'testnet' ? ['https://near-testnet.drpc.org', 'https://test.rpc.fastnear.com'].find((u) => u !== cfg.rpc) : '';
     this.fallback = alt ? new JsonRpcProvider({ url: alt }) : null;
+  }
+
+  /** The newest final block height the RPC pool reports. */
+  async height(): Promise<number> {
+    const b = await this.rpc((provider) => provider.viewBlock({ finality: 'final' }));
+    return Number(b.header.height);
   }
 
   private async rpc<T>(read: (provider: JsonRpcProvider) => Promise<T>): Promise<T> {

@@ -40,3 +40,14 @@ test('canSettleAgain: only after the replay, with a divergence, while the claim 
     expect(canSettleAgain({ status: 'sealed', divergence: null } as never, true, false)).toBe(false);
     expect(canSettleAgain(null, true, false)).toBe(false);
 });
+
+import { ANSWER_BLOCKS, blocksToExpiry, expiryBlock } from '../src/fork.ts';
+import { test as expiryTest, expect as expiryExpect } from 'bun:test';
+expiryTest('the answer window closes ANSWER_BLOCKS after the seal and never goes negative', () => {
+  const f = { sealed_block: 1000 };
+  expiryExpect(expiryBlock(f)).toBe(1000 + ANSWER_BLOCKS);
+  expiryExpect(blocksToExpiry(f, 1000)).toBe(ANSWER_BLOCKS);
+  expiryExpect(blocksToExpiry(f, 1000 + ANSWER_BLOCKS - 1)).toBe(1);
+  expiryExpect(blocksToExpiry(f, 1000 + ANSWER_BLOCKS)).toBe(0);
+  expiryExpect(blocksToExpiry(f, 99999)).toBe(0);
+});

@@ -58,3 +58,8 @@ export function verdictLine(f: Fork): string {
   const win = f.branches[w], lose = f.branches[1 - w];
   return `The loss cap of ${win.rule} leaves the merchant ${win.final_gold - lose.final_gold} gold ahead of the cap of ${lose.rule}.${win.defaults < lose.defaults ? ` ${lose.defaults} default${lose.defaults > 1 ? "s reach" : " reaches"} the looser town.` : ""}`;
 }
+
+export const LATE_MS = 35_000;
+export const GIVEUP_MS = 90_000;
+/** How the page treats a sealed fork the merchant has not answered: keep waiting, offer a re-read, or offer a fresh split. */
+export const waitState = (waitedMs: number): 'wait' | 'late' | 'gaveup' => (waitedMs > GIVEUP_MS ? 'gaveup' : waitedMs > LATE_MS ? 'late' : 'wait');

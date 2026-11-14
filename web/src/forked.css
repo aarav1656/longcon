@@ -160,3 +160,21 @@
 .fsigned li b { color: var(--gold); margin-right: 4px; }
 .fsigned q { display: block; opacity: .85; font-size: 13px; quotes: none; overflow-wrap: anywhere; }
 .go[hidden]{display:none}
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 8px; counter-reset: st; }
+.steps li { counter-increment: st; display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 13px; color: var(--muted); background: var(--navy-2, #1b2036); box-shadow: 0 0 0 2px var(--navy-3, #2a3150); }
+.steps li::before { content: counter(st); font-weight: 700; }
+.steps li.done { color: var(--green-2, #5fbf6a); box-shadow: 0 0 0 2px var(--green-2, #5fbf6a); }
+.steps li.done::before { content: "\2713"; }
+.steps li.now { color: var(--navy-1, #11142a); background: var(--gold); box-shadow: 0 0 0 2px var(--gold); animation: stepnow 1.1s steps(2) infinite; }
+@keyframes stepnow { 50% { opacity: .72; } }
+@media (prefers-reduced-motion: reduce) { .steps li.now { animation: none; } }
+.flast { display: grid; gap: 4px; }
+.flast h2 { display: flex; align-items: center; gap: 8px; font-size: 17px; color: var(--gold); line-height: 1.2; margin: 0; }
+.flast .fk { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.flast .fdelta { padding: 4px 0 6px; }
+.flast .fdelta .fd b { font-size: 34px; }
+.flast .fdelta .fgap b { font-size: 40px; }
+.flast[hidden] { display: none; }
+.pitches { margin-top: 6px; }
+.pitches summary { cursor: pointer; color: var(--gold); font-size: 14px; }
+@media (max-width: 900px) { .controls { grid-template-columns: minmax(0, 1fr); } }

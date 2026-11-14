@@ -126,7 +126,7 @@ Bun.serve({
         } as any);
         const txHash = res?.transaction?.hash ?? res?.transactionOutcome?.id ?? res?.transaction_outcome?.id;
         const e = await early(txHash, checked.senderId);
-        return json({ ok: e.ok, error: e.error, value: e.value, method: checked.method, tx: txHash }, e.ok ? 200 : 422);
+        return json({ ok: e.ok, error: e.error, value: e.value, method: checked.method, tx: txHash }, 200);
       }
       return json({ error: 'not found' }, 404);
     } catch (e: any) {

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { dayFeed, richer, verdictLine, type Branch, type Fork } from '../src/fork.ts';
+import { dayFeed, richer, verdictLine, waitState, type Branch, type Fork } from '../src/fork.ts';
 
 const loan = (o: Partial<Branch['loans'][0]>): Branch['loans'][0] => ({ rank: 0, slot: 0, name: 'X', accepted: true, proposed_advance: 10, advance: 10, repay: 12, due_day: 2, class: 'other', reason: '', clamps: [], repays: true, ...o });
 const branch = (rule: number, final_gold: number, defaults: number, loans: Branch['loans']): Branch => ({ rule, start_hash: '', loans, rows: [], cons: [], final_gold, defaults, lost: defaults * 3, cap_bound: false, outcome: 'thrives' });
@@ -17,4 +17,10 @@ test('richer and verdictLine name the better rule and the gap', () => {
   const tie = { branches: [branch(15, 202, 0, []), branch(25, 202, 0, [])] } as unknown as Fork;
   expect(richer(tie)).toBeNull();
   expect(verdictLine(tie)).toContain('changed nothing');
+});
+
+test('waitState: keeps waiting, offers a re-read, then a fresh split as the merchant stays silent', () => {
+    expect(waitState(34_000)).toBe('wait');
+    expect(waitState(36_000)).toBe('late');
+    expect(waitState(91_000)).toBe('gaveup');
 });

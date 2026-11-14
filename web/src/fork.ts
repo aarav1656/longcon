@@ -63,3 +63,10 @@ export const LATE_MS = 35_000;
 export const GIVEUP_MS = 90_000;
 /** How the page treats a sealed fork the merchant has not answered: keep waiting, offer a re-read, or offer a fresh split. */
 export const waitState = (waitedMs: number): 'wait' | 'late' | 'gaveup' => (waitedMs > GIVEUP_MS ? 'gaveup' : waitedMs > LATE_MS ? 'late' : 'wait');
+
+export const READ_FAIL_LIMIT = 3;
+/** A run of failed chain reads stays quiet for two tries, then the page says so and offers a re-read. */
+export const readHealth = (consecutiveFailures: number): 'ok' | 'failing' => (consecutiveFailures >= READ_FAIL_LIMIT ? 'failing' : 'ok');
+/** A settle is worth offering again once the seven days played, the branches diverged and the claim is still open. */
+export const canSettleAgain = (f: Pick<Fork, 'status' | 'divergence'> | null, replayDone: boolean, settling: boolean): boolean =>
+  !!f && replayDone && !settling && !!f.divergence && f.status !== 'settled';

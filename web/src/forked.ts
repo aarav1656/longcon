@@ -1,7 +1,7 @@
 import './style.css';
 import './forked.css';
 import { Chain, ChainError, identity, loadConfig, type Config } from './chain.ts';
-import { CAST, RULES, dayFeed, readFork, richer, verdictLine, waitState, type Branch, type Fork, type Rule } from './fork.ts';
+import { CAST, RULES, canSettleAgain, dayFeed, readFork, readHealth, richer, verdictLine, waitState, type Branch, type Fork, type Rule } from './fork.ts';
 import { clampSentence, esc, shortId, txUrl } from './words.ts';
 
 const FORK_SLOT = 'longcon.fork';
@@ -25,6 +25,10 @@ let settling = false;
 let sealedAt = 0;
 let lateShown = false;
 let gaveShown = false;
+let readFails = 0;
+let readErr = '';
+let failShown = false;
+let settleFailed = false;
 let lastFork: Fork | null = null;
 let merchantName = "the merchant";
 let openPurse: number | null = null;
@@ -89,7 +93,7 @@ function renderControls() {
   const wait = sealing ? waitState(waited) : 'wait';
   const late = wait !== 'wait';
   const gaveUp = wait === 'gaveup';
-  lateShown = late; gaveShown = gaveUp;
+  lateShown = late; gaveShown = gaveUp; failShown = readHealth(readFails) === 'failing';
   const at = stage();
   put('#controls', `
     <div class="pick">
@@ -97,6 +101,8 @@ function renderControls() {
       <div class="btns">${RULES.map((r) => `<button class="btn ${!fork || backed === r ? 'gold' : ''} big" type="button" data-cap="${r}" ${!picked ? '' : 'disabled'} ${busy.startsWith('split') && backed === r ? 'aria-busy="true"' : ''}>${label(r)}</button>`).join('')}</div>
     </div>
     ${picked ? `<ol class="steps" aria-label="Progress">${STEPS.map((t, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}">${esc(t)}</li>`).join('')}</ol>` : ''}
+    ${sealing && readHealth(readFails) === 'failing' ? `<p class="retry">The chain read is failing (${esc(readErr || 'no answer')}). Your seal is on chain and nothing is lost. <button class="btn gold" type="button" data-act="recheck">Read again</button></p>` : ''}
+    ${settleFailed && canSettleAgain(fork, replayDone(), settling) ? '<p class="retry">The claim did not settle yet. The divergence receipt is still valid. <button class="btn gold" type="button" data-act="settle">Settle again</button></p>' : ''}
     ${gaveUp ? '<p class="retry">The merchant has not signed in 90 s. Your seal stays on chain and the answer settles it if it lands. <button class="btn gold" type="button" data-act="again">Split a new town</button></p>'
       : late ? '<p class="retry">The merchant is taking longer than usual. The seal is on chain, and the answer settles it the moment it lands. <button class="btn gold" type="button" data-act="recheck">Check again</button></p>' : ''}
     ${onboardFailed ? '<p class="retry"><button class="btn gold" type="button" data-act="retry">Retry</button></p>' : ''}
@@ -339,14 +345,16 @@ async function seal() {
 
 async function recheck() {
   if (!fork || fork.status !== 'sealed') return;
-  try { fork = (await readFork(chain, fork.id)) ?? fork; } catch { /* the follow loop keeps reading */ }
+  try { fork = (await readFork(chain, fork.id)) ?? fork; readFails = 0; readErr = ''; }
+  catch (e) { readFails += 1; readErr = (e as Error).message.slice(0, 80); }
   renderControls();
 }
 
 async function follow() {
   while (fork && fork.status === 'sealed') {
     await nap(1200);
-    try { fork = (await readFork(chain, fork.id)) ?? fork; } catch { /* the next read retries */ }
+    try { fork = (await readFork(chain, fork.id)) ?? fork; readFails = 0; readErr = ''; }
+    catch (e) { readFails += 1; readErr = (e as Error).message.slice(0, 80); }
     renderControls();
   }
   if (fork && fork.status !== 'open' && !replayAt) { replayAt = Date.now(); render(); void settle(); }
@@ -359,7 +367,9 @@ async function settle() {
     const done = await call("settle", "fork_settle", { fork_id: fork.id, receipt: fork.divergence.receipt });
     fork = (await readFork(chain, fork.id)) ?? fork;
     settled = { tx: done.tx ?? "", seconds: elapsed() };
+    settleFailed = false;
   } catch (e) {
+    settleFailed = true;
     notice = { kind: 'bad', text: (e as Error).message, tx: e instanceof ChainError ? e.tx : undefined };
   }
   settling = false;
@@ -411,6 +421,7 @@ async function boot() {
     else if (t.dataset.act === 'again') again();
     else if (t.dataset.act === 'retry') void onboard();
     else if (t.dataset.act === 'recheck') void recheck();
+    else if (t.dataset.act === 'settle') void settle();
   });
   const st = await chain.view<{ merchants: { name: string; gold: number }[] }>("state").catch(() => null);
   if (st?.merchants?.[0]) { merchantName = st.merchants[0].name; openPurse = Math.min(200, st.merchants[0].gold); render(); }
@@ -425,7 +436,7 @@ async function boot() {
       const n = document.querySelector('#controls .status .num');
       if (n) n.textContent = `${Math.max(0, Math.round((Date.now() - sealedAt) / 1000))} s`;
       const ws = waitState(Date.now() - sealedAt);
-      if ((!lateShown && ws !== 'wait') || (!gaveShown && ws === 'gaveup')) renderControls();
+      if ((!lateShown && ws !== 'wait') || (!gaveShown && ws === 'gaveup') || (!failShown && readHealth(readFails) === 'failing')) renderControls();
     }
   }, 250);
 }

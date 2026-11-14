@@ -157,7 +157,9 @@ export class Chain {
     const run = this.sending.then(async () => {
       for (let attempt = 0; ; attempt++) {
         try { return await this.sendOnce(method, args); } catch (e) {
-          if (attempt < 3 && /InvalidNonce/.test((e as ChainError).raw ?? "")) { await new Promise((res) => setTimeout(res, 1500)); continue; }
+          const raw = (e as ChainError).raw ?? "";
+          if (attempt < 3 && /InvalidNonce/.test(raw)) { await new Promise((res) => setTimeout(res, 1500)); continue; }
+          if (attempt < relayPauses.length && relayBusy(raw)) { await new Promise((res) => setTimeout(res, relayPauses[attempt])); continue; }
           throw e;
         }
       }
@@ -182,21 +184,30 @@ export class Chain {
     } as any);
     this.lastNonce = da.nonce;
     const { signedDelegate } = await new KeyPairSigner(this.me.kp).signDelegateAction(da);
-    const r = await fetch(`${this.cfg.relayer}/relay`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ signed_delegate: b64(encodeSignedDelegate(signedDelegate)) }),
-    });
+    let r: Response;
+    try {
+      r = await fetch(`${this.cfg.relayer}/relay`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ signed_delegate: b64(encodeSignedDelegate(signedDelegate)) }),
+      });
+    } catch { throw new ChainError(explain('relay unreachable'), undefined, 'relay unreachable'); }
     const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.ok === false) throw new ChainError(explain(j.error ?? `relay ${r.status}`), j.tx, String(j.error ?? ""));
+    if (!r.ok || j.ok === false) throw new ChainError(explain(j.error ?? `relay ${r.status}`), j.tx, String(j.error ?? `relay ${r.status}`));
     return { tx: j.tx, value: j.value };
   }
 }
+
+/** Waits between retries when the relayer is rate limited or briefly down; a contract refusal is never retried. */
+export const relayPauses = [2000, 4000, 8000];
+export const relayBusy = (raw: string) => /^relay (429|5\d\d)$|^relay unreachable$/.test(raw.trim());
 
 /** Contract panics arrive wrapped in RPC JSON. Pull out the sentence the contract wrote. */
 export function explain(raw: string): string {
   const m = raw.match(/Smart contract panicked: ([^"\\]+)/);
   if (m) return m[1].trim();
+  if (/^relay 429$/.test(raw.trim())) return "The relayer is rate limited right now. Nothing was sent. Press the cap again in a few seconds.";
+  if (/^relay (5\d\d|unreachable)$/.test(raw.trim())) return "The relayer did not answer. Nothing was sent. Press the cap again in a few seconds.";
   if (/InvalidNonce/.test(raw)) return "Another window of yours sent a call at the same moment. Try again in a few seconds.";
   if (/^\s*[{\[]/.test(raw)) return "The network did not accept that call. Try again.";
   return raw.trim();

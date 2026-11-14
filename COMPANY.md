@@ -22,6 +22,7 @@ The visitor picks a daily loss cap (15 or 25). The contract clones the town into
 | A sealed batch of concurrent traveler answers was recorded and verified on chain. | Batch resume tx [9X3PFF9aJNN1Bvu4mdsb9JrUMPdSBVaD3D5hvEMU15fY](https://testnet.nearblocks.io/txns/9X3PFF9aJNN1Bvu4mdsb9JrUMPdSBVaD3D5hvEMU15fY), `npc_resume_batch` with the signature checked by the contract. |
 | The live app, relayer health and contract are reachable from the public URL. | `curl -s https://near-longcon.nearlive.workers.dev/api/health`, `curl -s https://near-longcon.nearlive.workers.dev/config.json`, `curl -s https://near-longcon.nearlive.workers.dev/rules.rs.txt \| head`. |
 | Git history records `kamalbuilds` as commit author from 2026-10-31 through the latest commit. | `git log --reverse --format='%ad %an' --date=short`; `git log -1 --format='%ad %an' --date=short`. |
+| CI runs on every push to main and the run for the latest commit is green. | `gh run list --repo CryptoInnovators/near-longcon --branch main --limit 3`, for example [run 43627096332](https://github.com/CryptoInnovators/near-longcon/actions/runs/43627096332). |
 
 ## Try it in 60 seconds
 

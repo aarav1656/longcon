@@ -97,3 +97,22 @@ describe('relay probe and per-tab identity', () => {
     expect(identity(true).id).not.toBe(a.id);
   });
 });
+
+test('a rate-limited relay is retried, then explained in words; a contract refusal is never retried', async () => {
+  const { ChainError, relayPauses } = await import('../src/chain.ts');
+  relayPauses.splice(0, relayPauses.length, 0, 0, 0);
+  const mk = () => new Chain({ contract_id: 'road.testnet', network: 'sandbox', rpc: 'http://rpc', relayer: '', explorer: '' }, { id: 'p', kp: KeyPair.fromRandom('ed25519') });
+  const c = mk(); let n = 0;
+  (c as any).sendOnce = async () => { n++; if (n < 3) throw new ChainError(explain('relay 429'), undefined, 'relay 429'); return { tx: 'T1' }; };
+  expect((await c.send('fork_town', {})).tx).toBe('T1');
+  expect(n).toBe(3);
+  const d = mk(); let m = 0;
+  (d as any).sendOnce = async () => { m++; throw new ChainError(explain('relay 429'), undefined, 'relay 429'); };
+  await expect(d.send('fork_town', {})).rejects.toThrow('rate limited right now. Nothing was sent');
+  expect(m).toBe(4);
+  const e = mk(); let k = 0;
+  (e as any).sendOnce = async () => { k++; throw new ChainError('the rule is frozen', 'TX', 'Smart contract panicked: the rule is frozen'); };
+  await expect(e.send('fork_rule', {})).rejects.toThrow('frozen');
+  expect(k).toBe(1);
+  expect(explain('relay 502')).toContain('did not answer');
+});

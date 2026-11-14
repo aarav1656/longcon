@@ -39,7 +39,7 @@ Prerequisites: Rust stable with `wasm32-unknown-unknown`, `near-cli-rs` 0.20, `w
 
 1. Run the contract suite from a clean clone: `cargo test --workspace`.
    See `test result: ok` for the unit tests and each sandbox binary. The suite currently contains 68 async sandbox tests and 26 contract unit tests across attestation, batch, clamps, guards, hardening, lifecycle, reputation, rumours and sybil. The sandbox runs the real wasm through real receipts.
-2. Run the client tests: `(cd worker && bun install && bun test ./test) && (cd web && bun install && bun test ./test)`.
+2. Run the client tests: `bun run test` at the repo root, or `bun test ./test` inside `worker` and `web` (a test preload installs the locked dependencies on a fresh clone).
    See `0 fail` twice.
 3. Build the contract wasm the tests and the deploy script use: `scripts/build-wasm.sh`.
    See `target/wasm/longcon.wasm` listed with its size.

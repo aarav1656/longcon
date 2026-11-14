@@ -23,7 +23,7 @@ const inflight = new Set<number>();
 const handled = new Set<number>();
 const sealing = new Set<number>();
 const forksHandled = new Set<number>();
-const FORK_ANSWER_MS = Number(process.env.FORK_ANSWER_MS ?? 90_000);
+const FORK_ANSWER_MS = Number(process.env.FORK_ANSWER_MS ?? 180_000);
 let signatureFailures = 0;
 
 function log(o: object) {

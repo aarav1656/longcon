@@ -336,7 +336,7 @@ function renderStage() {
   if (mine && !pv?.pending_offer) {
     if (stampFor !== o!.id) {
       stampFor = o!.id;
-      setHtml($('#seal'), `<div class="stamp" data-s="${esc(o!.status)}"><span>${esc(o!.status === 'committed' ? `${o!.outcome!.advance} gold advanced` : o!.status)}</span></div>`);
+      setHtml($('#seal'), `<div class="outcome" data-s="${esc(o!.status)}">${esc(o!.status === 'committed' ? `${o!.outcome!.advance} gold advanced` : o!.status)}</div>`);
     }
   } else if (stampFor !== -1) { stampFor = -1; setHtml($('#seal'), ''); }
   if (!m) { put('#sign', '<h2>The road</h2><p>Reading the contract</p>'); return; }

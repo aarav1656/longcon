@@ -166,9 +166,8 @@ function renderTwins() {
         ${backed === rule ? '<span class="you">You back this</span>' : ''}
         <div class="pursebar"><span class="fcoin"></span><b class="num">${gold ?? '–'}</b><span class="fk">${row ? `day ${idx}` : 'purse'}</span></div>
         ${b ? `<div class="fchartbox">${chart(i, Math.max(0, idx))}</div>` : ""}
-        ${lost ? `<div class="fstamp">DEFAULT −${lost}</div>` : ''}
+        ${lost ? `<div class="fdebt deep"><b class="num">−${lost}</b><span>gold lost to an unpaid loan</span></div>` : ''}
         ${done && debt > 0 && !lost ? `<div class="fdebt${behind ? ' deep' : ''}"><b class="num">−${debt}</b><span>gold lost to an unpaid loan</span></div>` : ''}
-        ${win ? '<div class="crown">KEEPS MORE GOLD</div>' : ''}
       </div>
       <div class="ledger">
         <ul class="loans">${loans}</ul>

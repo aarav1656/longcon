@@ -201,10 +201,6 @@ footer .who { display: flex; align-items: center; justify-content: center; gap: 
 .quest.wait .dot { background: var(--slate); }
 @keyframes blink { 50% { opacity: .25; } }
 
-.stamp { position: absolute; left: 27%; top: 30%; width: 13%; aspect-ratio: 1; background: url('/art/stamps.png') 0 0 / 300% 100%; image-rendering: pixelated; animation: slam .5s steps(5) both; pointer-events: none; }
-.stamp[data-s="refused"] { background-position-x: 50%; } .stamp[data-s="timed_out"] { background-position-x: 100%; }
-.stamp span { position: absolute; left: 50%; bottom: -16%; transform: translateX(-50%) rotate(-6deg); white-space: nowrap; font-weight: 700; font-size: clamp(14px, 1.8vw, 22px); padding: 0 8px 2px; background: var(--ink); color: var(--cream); }
-@keyframes slam { 0% { transform: scale(2.4) rotate(-14deg); opacity: 0; } 60% { transform: scale(.92) rotate(4deg); opacity: 1; } 100% { transform: scale(1) rotate(-4deg); } }
 .coins { position: absolute; inset: 0; pointer-events: none; }
 .coins i { position: absolute; width: 3.75%; aspect-ratio: 1; background: url('/art/coin.png') 0 0 / 800% 100%; image-rendering: pixelated; animation: spin .5s steps(8) infinite, fly 1.3s cubic-bezier(.3, -.4, .7, 1) forwards; }
 @keyframes spin { to { background-position-x: -800%; } }
@@ -320,19 +316,17 @@ footer { font-size: 12px; color: var(--muted); text-align: center; padding: 8px;
   .chip .k { font-size: 10px; white-space: normal; } .chip .v { font-size: 18px; } .chip .daybar { width: 100%; }
   .bubble { left: 56%; top: 6%; max-width: 42%; font-size: 11px; padding: 4px 6px; }
   .bubble::before, .bubble::after { display: none; }
-  .stamp { left: 4%; top: 36%; width: 22%; }
   .quest { font-size: 12px; width: 92%; }
   .wager { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .wager .btn { grid-column: 1 / -1; }
   .tri .r { grid-template-columns: 96px minmax(0, 1fr) 32px; }
-  .stamp { width: 24%; left: 60%; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
 /* Pixel face only where it is big enough to read; everything else is Atkinson Hyperlegible. */
-.logo b, .chip .v, .sign h2, .nameplate, .clock, .tri b, .traction-grid dd, .stamp span, .verdict h3, .sec h2, .btn.big, .wname { font-family: var(--font-pixel); }
+.logo b, .chip .v, .sign h2, .nameplate, .clock, .tri b, .traction-grid dd, .verdict h3, .sec h2, .btn.big, .wname { font-family: var(--font-pixel); }
 .chip .k, .hint, .fine, .empty, .k, label { font-size: 14px; color: var(--cream-2); }
 .btn { font-weight: 700; }
 
@@ -482,7 +476,7 @@ footer { padding: 14px 12px; }
 .chip .v, .tri b, .clock, .traction-grid dd, .sign b, .num { font-family: var(--font); font-weight: 700; }
 .err:empty { display: none; }
 textarea { min-height: 56px; }
-h3 .num, .stamp span, .chip .v { font-family: var(--font); font-weight: 700; }
+h3 .num, .chip .v { font-family: var(--font); font-weight: 700; }
 @media (max-width: 700px) {
   .board, .bubble { display: none; }
   .choices { flex-wrap: nowrap; gap: 4px; }
@@ -570,3 +564,4 @@ h3 .num, .stamp span, .chip .v { font-family: var(--font); font-weight: 700; }
   .qp { -webkit-line-clamp: 2; font-size: 13px; }
   .qrow { grid-template-columns: 26px minmax(0, 1fr) auto; padding: 5px 8px; }
 }
+.outcome { position: absolute; left: 27%; top: 36%; padding: 2px 8px; background: var(--ink); color: var(--cream); font-weight: 700; font-size: clamp(14px, 1.8vw, 22px); white-space: nowrap; pointer-events: none; }

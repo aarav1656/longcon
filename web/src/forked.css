@@ -34,14 +34,11 @@
 .ftag { position: absolute; left: 2.5%; top: 4%; max-width: 58%; background: var(--scrim); box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--gold-3); padding: 6px 10px 8px; }
 .ftag h2 { font-size: clamp(16px, 2.2vw, 26px); font-weight: 700; line-height: 1; color: var(--gold); text-shadow: 0 3px 0 var(--ink); }
 .ftag p { font-size: 12.5px; color: var(--cream-2); margin-top: 4px; line-height: 1.25; }
-.you { position: absolute; right: 2.5%; top: 4%; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-ink); background: var(--gold); padding: 3px 8px 4px; box-shadow: 0 0 0 2px var(--ink); }
+.you { position: absolute; right: 2.5%; top: 4%; font-size: 12px; font-weight: 700; color: var(--gold-ink); background: var(--gold); padding: 3px 8px 4px; box-shadow: 0 0 0 2px var(--ink); }
 .pursebar { position: absolute; left: 2.5%; bottom: 5%; display: flex; align-items: center; gap: 8px; background: var(--scrim); box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--gold-3); padding: 4px 12px 5px 8px; }
 .pursebar .fcoin { width: 20px; height: 20px; background: url('/art/icons.png') 0 0 / 200px 20px; image-rendering: pixelated; }
 .pursebar b { font-size: 26px; line-height: 1; color: var(--cream); min-width: 3ch; }
 .pursebar .fk { font-size: 12px; color: var(--muted); }
-.fstamp { position: absolute; right: 4%; bottom: 14%; font: 700 clamp(18px, 3vw, 34px) var(--font-pixel); color: var(--red-2); border: 4px solid var(--red); padding: 2px 12px; transform: rotate(-6deg); background: rgba(40, 10, 10, .72); animation: stampin .35s steps(4) both; }
-.crown { position: absolute; right: 4%; bottom: 8%; font: 700 clamp(14px, 2vw, 22px) var(--font-pixel); color: var(--green-3); background: var(--green-2); padding: 3px 12px; box-shadow: 0 0 0 3px var(--ink); animation: stampin .35s steps(4) both; }
-@keyframes stampin { from { transform: scale(1.7) rotate(-14deg); opacity: 0; } }
 
 .ledger { display: grid; gap: 8px; }
 .loans { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -124,8 +121,6 @@
 .chip2 em { font-style: normal; color: var(--gold); font-weight: 700; }
 .fchartbox { position: absolute; right: 2.5%; bottom: 5%; width: 44%; background: rgba(18, 22, 36, .86); box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--gold-3); padding: 4px; }
 .fchartbox .chart { box-shadow: none; background: transparent; display: block; }
-.fstamp { right: 4%; bottom: auto; top: 27%; }
-.crown { bottom: auto; top: 22%; right: 2.5%; background: var(--green-2); color: #10381a; }
 .fork .btn.gold:disabled { filter: none; opacity: .92; cursor: default; }
 .fork .btn.green:disabled { filter: none; opacity: .75; }
 .fverdict[hidden] { display: none; }

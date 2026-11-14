@@ -679,7 +679,7 @@ The owner transferred 1 NEAR to the same testnet relayer. This transaction reach
 
 ## Long Con traction
 
-Playable page: https://near-longcon.nearbuild.workers.dev/game.html. Contract: `longcon4-game.testnet`.
+Playable page: https://near-longcon.nearlive.workers.dev/game.html. Contract: `longcon4-game.testnet`.
 
 Read time: `2026-11-11T22:10:08.203Z`; finalized source height: `277274723`. Counters come from successful finalized contract receipts: pitches count distinct `offer_opened` events, loans count distinct `offer_settled` events with `status=committed` and positive advance, and defaults count distinct `con_landed` events. The hosted page API returned matching values.
 
@@ -740,7 +740,7 @@ Counts at finalized height `277274723`: pitches `53`, loans `36`, defaults `36`.
 | What | Value |
 |---|---|
 | Rule | `fork_expire` (contract/src/fork.rs): 200 blocks after the seal, anyone may close a sealed fork with no signed answer; the claim becomes `void`, the creator's town allowance returns, a late answer is refused |
-| Run | merchant worker paused, cold visitor presses cap 15 on `https://near-longcon.nearbuild.workers.dev/`; the page counts down and calls `fork_expire` itself |
+| Run | merchant worker paused, cold visitor presses cap 15 on `https://near-longcon.nearlive.workers.dev/`; the page counts down and calls `fork_expire` itself |
 | Closed | fork `65` sealed at block `277665294`, expired at `277665503`, tx `8njN2oTrKPZXbWjERqTjbM5KofjmNmffmdmkBb56tK5S`; fork `66` sealed `277665679`, expired `277665890`, tx `GSCi759rrMGug9pc2yT161ARRpmPhHKYAuH9oULYT7d9`; both read back `status expired`, `claim.status void` |
 | Must-fail | `fork_expire` on fork `66` 44 blocks after its seal: tx `j56pWRYKBPaSH6LKavqCzyQqW6eL3XbLdGAi6Zgspqc` panics `the merchant still has time to answer: the window closes at block 277665879, 156 blocks from now` |
 | Deployed code | upgrade tx `EdHaz2kjvXLXTXwSHgnTghSNJzGhc8F7AaWyLa6s45Z3`, wasm sha256 `c84b6e18dd154096fc9304a4ad79614dfeba49e057e3b98290f1a42b9e8de95f` |

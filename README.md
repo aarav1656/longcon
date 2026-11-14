@@ -13,7 +13,7 @@ Games that let you talk an AI into lending keep their rules on a private server.
 
 ## Fork the town: pick one rule, watch two economies (live, no wallet, no install)
 
-Open https://near-longcon.nearbuild.workers.dev/game in any browser. Every step below runs against the live testnet contract `longcon4-game.testnet`.
+Open https://near-longcon.nearlive.workers.dev/game in any browser. Every step below runs against the live testnet contract `longcon4-game.testnet`.
 
 1. **Do:** open the link. **See:** a pixel market road, the line "Pick a rule. The contract splits the town in two and one signed answer runs through both.", the queue at Marta's stall (`Wick 30`, `Sable 30`, `Ines 12`, `Tam 10`) and two buttons, `Daily loss cap 15` and `Daily loss cap 25`. The status reads `NEAR testnet, account ready` once your account exists on testnet.
 2. **Do:** press one cap. **See:** the town splits into two panes that differ only in the daily loss cap; your pick is tagged `BACKED`, and a step list (split, seal, merchant signs, seven days, claim settles) walks forward on its own. The `fork_town` and `fork_seal` transaction links appear in the proof panel. Above the panes a card shows an earlier split settled on chain: both towns' final gold, the signer and the block.
@@ -22,7 +22,7 @@ Open https://near-longcon.nearbuild.workers.dev/game in any browser. Every step 
 5. **Do:** press `Try to change the rule now`. **See:** the contract refuses the edit with its own sentence (the rule is frozen) and the refused transaction link.
 6. **Verify on chain:** `near contract call-function as-read-only longcon4-game.testnet fork json-args '{"fork_id":4}' network-config testnet now` returns a settled fork with both branches and the claim; the proof panel shows the same command with your own fork id.
 
-What the closest entries on the board do not show in their first minute: Bouncer is one visitor against one guard; Freysa, on Base, is one visitor against one model for a fixed pot; Nims and the other merchant-agent entries quote prices to one buyer at a time. In Forked Town the visitor changes one rule and watches two parallel economies run from the same signed answer, with the receipt of where they first diverged and a claim the contract settles against it. The earlier queue game (four sealed pitches against one merchant, the purse drained down the model's ranked list) stays live at https://near-longcon.nearbuild.workers.dev/queue.
+What the closest entries on the board do not show in their first minute: Bouncer is one visitor against one guard; Freysa, on Base, is one visitor against one model for a fixed pot; Nims and the other merchant-agent entries quote prices to one buyer at a time. In Forked Town the visitor changes one rule and watches two parallel economies run from the same signed answer, with the receipt of where they first diverged and a claim the contract settles against it. The earlier queue game (four sealed pitches against one merchant, the purse drained down the model's ranked list) stays live at https://near-longcon.nearlive.workers.dev/queue.
 
 Source for the page: `web/src/forked.ts` and `web/src/forked.css` (the two towns, replay and proof panel), `web/src/fork.ts` (the cast and reading a fork), `contract/src/fork.rs` (`fork_town`, `fork_rule`, `fork_seal`, `fork_settle`).
 

@@ -1,7 +1,7 @@
 import { KeyPair } from 'near-api-js';
 import { Chain, ChainError, type Config } from '../src/chain.ts';
 const cfg: Config = await Bun.file(new URL('../public/config.json', import.meta.url)).json();
-const site = 'https://near-longcon.nearbuild.workers.dev';
+const site = 'https://near-longcon.nearlive.workers.dev';
 if (cfg.relayer.startsWith('/')) cfg.relayer = site + cfg.relayer;
 if (cfg.rpc.startsWith('/')) cfg.rpc = site + cfg.rpc;
 if (process.env.RELAYER_URL) cfg.relayer = process.env.RELAYER_URL;

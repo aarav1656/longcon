@@ -1,5 +1,5 @@
 #!/bin/bash
-# Keeps the longcon hub agent (laptop -> near-longcon.nearbuild.workers.dev WebSocket) running; checks every 30 s.
+# Keeps the longcon hub agent (laptop -> near-longcon.nearlive.workers.dev WebSocket) running; checks every 30 s.
 cd /Users/kamal/near-build/longcon || exit 1
 mkdir -p /tmp/lc-tunnel
 while :; do

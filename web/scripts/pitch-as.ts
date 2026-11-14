@@ -5,7 +5,7 @@ import { Chain, type Config } from '../src/chain.ts';
 
 const [pitch = 'Two gold until tomorrow for a sack of seed. I pay back three.', ask = '2', bond = '5', merchant = '0'] = process.argv.slice(2);
 const cfg: Config = await Bun.file(new URL('../public/config.json', import.meta.url)).json();
-const site = process.env.SITE ?? 'https://near-longcon.nearbuild.workers.dev';
+const site = process.env.SITE ?? 'https://near-longcon.nearlive.workers.dev';
 if (cfg.relayer.startsWith('/')) cfg.relayer = site + cfg.relayer;
 if (cfg.rpc.startsWith('/')) cfg.rpc = site + cfg.rpc;
 if (process.env.RELAYER_URL) cfg.relayer = process.env.RELAYER_URL;

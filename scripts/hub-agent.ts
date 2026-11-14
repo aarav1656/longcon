@@ -1,6 +1,6 @@
 // Holds one outbound WebSocket to the Worker's relayer hub and answers each call from the local relayer, so the page's /api/relay needs no inbound tunnel.
-// usage: HUB_SECRET=$(cat ~/.config/longcon/hub-secret) bun scripts/hub-agent.ts [wss://near-longcon.nearbuild.workers.dev/_hub/connect] [http://127.0.0.1:8790]
-const [hub = 'wss://near-longcon.nearbuild.workers.dev/_hub/connect', relayer = 'http://127.0.0.1:8790'] = process.argv.slice(2);
+// usage: HUB_SECRET=$(cat ~/.config/longcon/hub-secret) bun scripts/hub-agent.ts [wss://near-longcon.nearlive.workers.dev/_hub/connect] [http://127.0.0.1:8790]
+const [hub = 'wss://near-longcon.nearlive.workers.dev/_hub/connect', relayer = 'http://127.0.0.1:8790'] = process.argv.slice(2);
 const secret = process.env.HUB_SECRET;
 if (!secret) { console.error('HUB_SECRET missing'); process.exit(1); }
 

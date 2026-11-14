@@ -11,7 +11,7 @@ case "${1:-}" in
     ;;
   --evidence)
     payload=$(events)
-    base=${LONGCON_PUBLIC_URL:-https://near-longcon.pages.dev}
+    base=${LONGCON_PUBLIC_URL:-https://near-longcon.nearbuild.workers.dev}
     page=$(curl -fsSL -m 30 "$base/game.html")
     bundle_path=$(grep -oE 'src="[^"]*game-[^"]+\.js"' <<<"$page" | head -1 | cut -d'"' -f2)
     [[ -n "$bundle_path" ]] || { echo 'hosted game entry has no built client bundle' >&2; exit 1; }

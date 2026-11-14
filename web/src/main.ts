@@ -939,7 +939,7 @@ async function boot() {
     b.addEventListener('pointerdown', go); b.addEventListener('pointerup', stop); b.addEventListener('pointerleave', stop); b.addEventListener('pointercancel', stop);
   });
   void refreshTraction();
-  setInterval(() => { void refreshTraction(); }, 60_000);
+  setInterval(() => { if (document.visibilityState === "visible") void refreshTraction(); }, 60_000);
   renderHud();
   renderPitchGo();
   $('#pitchgo').focus({ preventScroll: true });

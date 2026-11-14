@@ -679,7 +679,7 @@ The owner transferred 1 NEAR to the same testnet relayer. This transaction reach
 
 ## Long Con traction
 
-Playable page: https://near-longcon.pages.dev/game.html. Contract: `longcon4-game.testnet`.
+Playable page: https://near-longcon.nearbuild.workers.dev/game.html. Contract: `longcon4-game.testnet`.
 
 Read time: `2026-11-11T22:10:08.203Z`; finalized source height: `277274723`. Counters come from successful finalized contract receipts: pitches count distinct `offer_opened` events, loans count distinct `offer_settled` events with `status=committed` and positive advance, and defaults count distinct `con_landed` events. The hosted page API returned matching values.
 

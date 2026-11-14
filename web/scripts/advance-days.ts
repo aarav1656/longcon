@@ -4,7 +4,7 @@ import { Chain, type Config } from '../src/chain.ts';
 
 const n = Number(process.argv[2] ?? 1);
 const cfg: Config = await Bun.file(new URL('../public/config.json', import.meta.url)).json();
-const site = process.env.SITE ?? 'https://near-longcon.pages.dev';
+const site = process.env.SITE ?? 'https://near-longcon.nearbuild.workers.dev';
 if (cfg.relayer.startsWith('/')) cfg.relayer = site + cfg.relayer;
 if (cfg.rpc.startsWith('/')) cfg.rpc = site + cfg.rpc;
 if (process.env.RELAYER_URL) cfg.relayer = process.env.RELAYER_URL;

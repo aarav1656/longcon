@@ -2,7 +2,7 @@
 set -u
 cd "$(dirname "$0")/.." || exit 1
 account='longcon4-game.testnet'
-page='https://near-longcon.pages.dev/'
+page='https://near-longcon.nearbuild.workers.dev/'
 test_cmd='cargo test --workspace --no-fail-fast'
 pass=0
 rpc_log=$(mktemp)

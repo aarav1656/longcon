@@ -1,7 +1,7 @@
 {
   "contract_id": "longcon4-game.testnet",
   "network": "testnet",
-  "rpc": "https://adipex-brown-meeting-acoustic.trycloudflare.com/rpc",
-  "relayer": "https://adipex-brown-meeting-acoustic.trycloudflare.com",
+  "rpc": "https://9bdfa34d20f897.app.lhr.life/rpc",
+  "relayer": "https://9bdfa34d20f897.app.lhr.life",
   "explorer": "https://testnet.nearblocks.io"
 }

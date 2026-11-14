@@ -734,3 +734,14 @@ Counts at finalized height `277274723`: pitches `53`, loans `36`, defaults `36`.
 | Tx | split `HpY2suio7wH4i6DQvjcBgABTUCP6RPLJfPf3taq2smJY`, seal `5CpyZ7zjHnwyLKHMuS745k5nZp3eszSbURA8BJDnAdPW`, settle `7wZHoUUN1jYbbpt6biFDeGeeY64BWTdnt73iJQG8HJ1D` |
 | Must-fail | rule edit after seal `GZN3PNp5t1fALgbLd6mibd5WpeYaWg5WQw7YWsMZL4Rn`, forged receipt `HqJAaP1WjmAnZUGe1FrjsGd1AEo4YfypdS2kDQA4GTLR`, replay `CEcV9iEBw3YD9DxDeVcGBQ9CqD61zL5vnJLhhJMt7knd` |
 | Cast rate | the exact sealed request replayed 12 times with fresh seal nonces: the previous cast booked nobody in 4 of 12, the current cast books Sable in 12 of 12 |
+
+## Forked Town: the contract closes a fork the merchant never answers
+
+| What | Value |
+|---|---|
+| Rule | `fork_expire` (contract/src/fork.rs): 200 blocks after the seal, anyone may close a sealed fork with no signed answer; the claim becomes `void`, the creator's town allowance returns, a late answer is refused |
+| Run | merchant worker paused, cold visitor presses cap 15 on `https://near-longcon.nearbuild.workers.dev/`; the page counts down and calls `fork_expire` itself |
+| Closed | fork `65` sealed at block `277665294`, expired at `277665503`, tx `8njN2oTrKPZXbWjERqTjbM5KofjmNmffmdmkBb56tK5S`; fork `66` sealed `277665679`, expired `277665890`, tx `GSCi759rrMGug9pc2yT161ARRpmPhHKYAuH9oULYT7d9`; both read back `status expired`, `claim.status void` |
+| Must-fail | `fork_expire` on fork `66` 44 blocks after its seal: tx `j56pWRYKBPaSH6LKavqCzyQqW6eL3XbLdGAi6Zgspqc` panics `the merchant still has time to answer: the window closes at block 277665879, 156 blocks from now` |
+| Deployed code | upgrade tx `EdHaz2kjvXLXTXwSHgnTghSNJzGhc8F7AaWyLa6s45Z3`, wasm sha256 `c84b6e18dd154096fc9304a4ad79614dfeba49e057e3b98290f1a42b9e8de95f` |
+| Cold run after the upgrade | account ready 10 s after load, settled claim 30 s after the cap press, 46 s from load, 0 HTTP errors |

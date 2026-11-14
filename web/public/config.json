@@ -1,7 +1,7 @@
 {
   "contract_id": "longcon4-game.testnet",
   "network": "testnet",
-  "rpc": "/api/rpc",
-  "relayer": "/api/relay",
+  "rpc": "https://raising-anne-professionals-regards.trycloudflare.com/rpc",
+  "relayer": "https://raising-anne-professionals-regards.trycloudflare.com",
   "explorer": "https://testnet.nearblocks.io"
 }

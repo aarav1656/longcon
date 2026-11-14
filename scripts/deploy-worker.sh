@@ -19,7 +19,7 @@ compatibility_date = "2026-11-01"
 [assets]
 directory = "./web/dist"
 binding = "ASSETS"
-run_worker_first = true
+run_worker_first = ["/api/*", "/_hub/*"]
 
 [[durable_objects.bindings]]
 name = "HUB"

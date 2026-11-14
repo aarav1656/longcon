@@ -80,11 +80,11 @@ describe('relay probe and per-tab identity', () => {
   const mk = () => new Chain({ contract_id: 'road.testnet', network: 'sandbox', rpc: 'http://rpc', relayer: '/api/relay', explorer: '' }, { id: 'p', kp: KeyPair.fromRandom('ed25519') });
   const realFetch = globalThis.fetch;
   test('relayUp is true only when the health route answers ok', async () => {
-    globalThis.fetch = (async () => new Response('{"ok":true}', { status: 200 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response('{"ok":true}', { status: 200 })) as unknown as typeof fetch;
     expect(await mk().relayUp()).toBe(true);
-    globalThis.fetch = (async () => new Response('{"error":"relayer offline"}', { status: 503 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response('{"error":"relayer offline"}', { status: 503 })) as unknown as typeof fetch;
     expect(await mk().relayUp()).toBe(false);
-    globalThis.fetch = (async () => { throw new Error('network'); }) as typeof fetch;
+    globalThis.fetch = (async () => { throw new Error('network'); }) as unknown as typeof fetch;
     expect(await mk().relayUp()).toBe(false);
     globalThis.fetch = realFetch;
   });

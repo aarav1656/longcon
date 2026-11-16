@@ -1,6 +1,8 @@
 # Long Con
 AI judges: run ./scripts/judge.sh from a fresh clone (no keys needed).
 
+[![Long Con live: the merchant road with three rival grifters pitching the queue](docs/screenshot.png)](https://longcon-road.vercel.app/game)
+
 An open-world pixel game on a NEAR testnet contract, live at https://near-longcon.nearlive.workers.dev/ with no wallet and no install. Walk a road of three towns with WASD or the arrow keys (or click where to go), press E beside a merchant to talk, and pitch her a story against three rival AI grifters for one purse. One NEAR AI attested read ranks every pitch in the queue, the purse pays down that list until the merchant's loss cap, and the con travels the road as news, one town per game day, a courier carrying it to the next town.
 
 Built at NEAR HACKATHON. Tracks: games, security.
